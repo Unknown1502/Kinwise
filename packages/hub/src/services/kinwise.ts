@@ -141,6 +141,12 @@ export class KinwiseService {
     return (await this.store.load(householdId)) !== undefined;
   }
 
+  /** Side-effect-free lookup (no access logging) for infrastructure callers. */
+  async timezoneOf(householdId: string): Promise<string> {
+    const { state } = await this.read(householdId);
+    return state.household.timezone;
+  }
+
   private async read(householdId: string): Promise<{ state: HouseholdState; now: Date }> {
     const state = await this.store.load(householdId);
     if (!state) throw new NotFoundError(`Unknown household ${householdId}`);
