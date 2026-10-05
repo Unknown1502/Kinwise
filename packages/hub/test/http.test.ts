@@ -14,7 +14,7 @@ async function makeApp(env: Record<string, string> = {}) {
 
 async function connect(app: App, token: string) {
   const transport = new StreamableHTTPClientTransport(new URL('http://kinwise.test/mcp'), {
-    fetch: (url, init) => app.fetch(new Request(url, init)),
+    fetch: async (url, init) => app.fetch(new Request(url, init)),
     requestInit: { headers: { authorization: `Bearer ${token}` } },
   });
   const client = new Client({ name: 'kinwise-test', version: '1.0.0' });

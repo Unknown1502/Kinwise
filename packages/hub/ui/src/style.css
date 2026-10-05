@@ -1,0 +1,75 @@
+:root {
+  --bg: #0f1712;
+  --surface: #17231b;
+  --surface-2: #1f2f24;
+  --text: #f5f1e8;
+  --muted: #b9c2b5;
+  --line: #2c3e31;
+  --brand: #fef3c7;
+  --ok: #4ade80;
+  --caution: #fbbf24;
+  --pause: #fb923c;
+  --focus: #fde68a;
+  --radius: 18px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 18px;
+  line-height: 1.45;
+  color-scheme: dark;
+}
+:root[data-theme='light'] {
+  --bg: #fbfaf6;
+  --surface: #ffffff;
+  --surface-2: #f3f1ea;
+  --text: #17231b;
+  --muted: #4b5a4f;
+  --line: #e2ded2;
+  --brand: #14532d;
+  --ok: #15803d;
+  --caution: #b45309;
+  --pause: #c2410c;
+  --focus: #14532d;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body { padding: 18px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.85rem; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 10px; }
+.brand svg { width: 22px; height: 22px; flex: none; }
+h1 { font-size: 1.6rem; line-height: 1.2; margin: 0 0 8px; }
+h2 { font-size: 1.05rem; margin: 18px 0 8px; color: var(--muted); font-weight: 600; }
+p { margin: 6px 0; }
+.muted { color: var(--muted); }
+.big { font-size: 1.25rem; }
+.banner { display: flex; gap: 14px; align-items: flex-start; border-radius: 14px; padding: 14px 16px; margin: 6px 0 4px; background: var(--surface-2); border-left: 6px solid var(--ok); }
+.banner.elevated { border-left-color: var(--caution); }
+.banner.high, .banner.pause { border-left-color: var(--pause); }
+.banner .icon { font-size: 1.6rem; line-height: 1; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; padding: 0; list-style: none; }
+.chip { border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 6px 12px; font-size: 0.9rem; }
+.signs { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
+.signs li { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; }
+.signs strong { display: block; }
+ul.advice { margin: 8px 0; padding-left: 22px; }
+ul.advice li { margin: 4px 0; }
+.rows { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.rows li { display: flex; justify-content: space-between; gap: 16px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+.rows .time { color: var(--muted); white-space: nowrap; }
+.flag { color: var(--caution); font-weight: 600; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+button { font: inherit; font-size: 1rem; border-radius: 999px; padding: 12px 20px; border: 2px solid var(--line); background: var(--surface-2); color: var(--text); cursor: pointer; }
+button.primary { background: var(--brand); color: #14261b; border-color: var(--brand); font-weight: 700; }
+:root[data-theme='light'] button.primary { color: #fff; }
+button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+button[disabled] { opacity: 0.6; cursor: default; }
+.timeline { list-style: none; margin: 0; padding: 0 0 0 18px; border-left: 3px solid var(--line); display: grid; gap: 12px; }
+.timeline li { position: relative; }
+.timeline li::before { content: ''; position: absolute; left: -27px; top: 6px; width: 14px; height: 14px; border-radius: 50%; background: var(--line); }
+.timeline li.pause_shown::before, .timeline li.visitor_unexpected::before { background: var(--pause); }
+.timeline li.call_checked::before, .timeline li.reminder_flagged::before, .timeline li.window_opened::before { background: var(--caution); }
+.timeline li.visitor_expected::before, .timeline li.alert_resolved::before { background: var(--ok); }
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 10px 0 16px; }
+.stat { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; }
+.stat b { display: block; font-size: 1.5rem; }
+.note { font-size: 0.85rem; color: var(--muted); margin-top: 14px; }
+.empty { color: var(--muted); font-style: italic; }

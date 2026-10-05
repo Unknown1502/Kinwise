@@ -34,3 +34,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# MCP Apps card build output (embedded into src/mcp/ui-bundle.generated.ts)
+packages/hub/ui/dist/
