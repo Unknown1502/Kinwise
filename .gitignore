@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# builds
+dist/
+build/
+cdk.out/
+*.tsbuildinfo
+.vite/
+coverage/
+.pytest_cache/
+.ruff_cache/
+
+# local state & secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+.kinwise-data/
+tokens/
+ring-token.txt
+
+# captured personal data (Ring frames, recordings) — never commit
+captures/
+*.jsonl
+frames/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

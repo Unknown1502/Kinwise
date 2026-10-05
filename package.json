@@ -1,0 +1,23 @@
+{
+  "name": "kinwise",
+  "private": true,
+  "description": "Kinwise — a consent-first family safety net across Alexa+, Ring and Fire TV",
+  "license": "Apache-2.0",
+  "workspaces": [
+    "packages/hub",
+    "packages/echo-sim",
+    "packages/tv-preview",
+    "infra"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:hub": "npm run dev -w @kinwise/hub",
+    "dev:echo": "npm run dev -w @kinwise/echo-sim",
+    "dev:tv": "npm run dev -w @kinwise/tv-preview"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
