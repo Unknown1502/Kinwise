@@ -228,6 +228,27 @@ export function createApp(deps: AppDeps): Hono<Env> {
       deps.outbox?.outbox.splice(0);
       return c.json({ ok: true });
     });
+    // Ring a simulated doorbell from the Echo/TV dev tools without the ingest secret.
+    app.post('/dev/visitor', async (c) => {
+      const body = await c.req.json<{ personPresent?: boolean; description?: string; carrying?: string }>().catch(() => ({}));
+      const personPresent = (body as { personPresent?: boolean }).personPresent ?? true;
+      const result = await service.ingestVisitor(config.demoHouseholdId, {
+        eventId: `demo-${Date.now()}`,
+        deviceId: 'demo-front-door',
+        occurredAt: new Date().toISOString(),
+        source: 'demo',
+        ringEventType: 'button_press',
+        perception: {
+          personPresent,
+          peopleCount: personPresent ? 1 : 0,
+          carrying: (body as { carrying?: string }).carrying,
+          description:
+            (body as { description?: string }).description ??
+            (personPresent ? 'A person at the front door holding a small box' : 'Motion at the front door, no one visible'),
+        },
+      });
+      return c.json(result);
+    });
   }
 
   return app;
