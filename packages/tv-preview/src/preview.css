@@ -1,0 +1,137 @@
+/* Chrome around the fake 1920×1080 TV. The app itself is styled by react-native-web. */
+:root {
+  --page: #070b08;
+  --bezel: #020302;
+  --text: #f5f1e8;
+  --muted: #b9c2b5;
+  --cream: #fef3c7;
+  --line: #2c4033;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: var(--page);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  gap: 10px;
+}
+
+.preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 14px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.preview-bar strong {
+  color: var(--cream);
+  font-weight: 600;
+}
+
+.preview-keys kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 1px 6px;
+  margin: 0 2px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #121a14;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: center;
+}
+
+.preview-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tv-bezel {
+  position: relative;
+  background: var(--bezel);
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px #1a221c;
+}
+
+.tv-viewport {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+/* The app renders into a real 1920×1080 box, scaled to fit the window. */
+.tv-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: 0 0;
+  display: flex;
+}
+
+.tv-canvas > * {
+  flex: 1;
+}
+
+.overscan-guide {
+  position: absolute;
+  inset: 5%;
+  border: 2px dashed rgba(254, 243, 199, 0.35);
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.voiceview {
+  font-size: 14px;
+  color: var(--muted);
+  min-height: 1.4em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voiceview strong {
+  color: var(--cream);
+}
+
+.preview-bar a,
+.preview-bar button {
+  color: var(--cream);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .preview {
+    padding: 8px;
+  }
+  .preview-keys {
+    display: none;
+  }
+}

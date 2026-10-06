@@ -76,9 +76,9 @@ def _session_manager(settings: Settings, req: AskRequest) -> Any | None:
     return AgentCoreMemorySessionManager(config, region_name=settings.region)
 
 
-def answer_bedrock(req: AskRequest, settings: Settings) -> AskResponse:
+def answer_bedrock(req: AskRequest, settings: Settings, hub_mcp_url: str | None = None) -> AskResponse:
     mcp = MCPClient(
-        url=settings.hub_mcp_url,
+        url=hub_mcp_url or settings.hub_mcp_url,
         headers={"Authorization": f"Bearer {req.token}"},
         application_name="kinwise-concierge",
         application_version="0.1.0",

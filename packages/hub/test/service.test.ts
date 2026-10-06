@@ -196,3 +196,34 @@ describe('KinwiseService — hero story', () => {
     expect(ex.summary).toMatch(/chose "I know this person"/);
   });
 });
+
+describe('KinwiseService — TV follow-ups', () => {
+  it('rejects unknown or non-boolean consent keys', async () => {
+    const { service, clock } = setup();
+    await service.createHousehold(demoHousehold(clock.now()));
+    await expect(service.updateConsent(asha, { foo: true } as never)).rejects.toBeInstanceOf(ValidationError);
+    await expect(service.updateConsent(asha, { doorAwareness: 'no' } as never)).rejects.toBeInstanceOf(ValidationError);
+    const c = await service.updateConsent(asha, { doorAwareness: false, onboarded: true });
+    expect(c).toMatchObject({ doorAwareness: false });
+    expect(c.onboardedAt).toBeDefined();
+    expect(Object.keys(c)).not.toContain('foo');
+  });
+
+  it('silently acknowledges expected-visitor notices only', async () => {
+    const { service, clock } = setup(local('10:15'));
+    await service.createHousehold(demoHousehold(clock.now()));
+    const { alertId } = await service.ingestVisitor(HH, visitor('luis', '10:15'));
+    const before = (await service.getTimeline(asha)).entries.length;
+    await service.acknowledgeAlert(tv, alertId!);
+    expect((await service.tvState(tv)).activeAlert).toBeUndefined();
+    expect((await service.getTimeline(asha)).entries.length).toBe(before);
+    clock.t = local('13:00');
+    const gentle = await service.ingestVisitor(HH, visitor('stranger', '13:00'));
+    await expect(service.acknowledgeAlert(tv, gentle.alertId!)).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it('has no demo video unless one is configured', () => {
+    expect(demoHousehold(new Date()).household.pauseMessage.videoUrl).toBeUndefined();
+    expect(demoHousehold(new Date(), 'UTC', 'https://cdn.example/p.mp4').household.pauseMessage.videoUrl).toBe('https://cdn.example/p.mp4');
+  });
+});

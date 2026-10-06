@@ -2,14 +2,19 @@ import { DEMO_HOUSEHOLD_ID } from './seed.js';
 
 export interface HubConfig {
   port: number;
-  publicBaseUrl: string;
+  /** Public origin of this hub. When unset (e.g. on Lambda behind API Gateway), it is derived per request. */
+  publicBaseUrl?: string;
   authMode: 'dev' | 'cognito';
   cognito?: { userPoolId: string; clientIds: string[]; issuer: string };
   /** username → household member, used in cognito mode. */
   userDirectory: Record<string, { householdId: string; role: 'resident' | 'caregiver'; name: string; memberId?: string }>;
-  /** Fire TV device tokens → household (cognito mode; dev mode uses `dev-tv`). */
+  /** Fire TV device tokens → household. */
   deviceTokens: Record<string, { householdId: string; deviceId: string; name: string }>;
   ingestSecret: string;
+  /** Secrets Manager ARN holding the ingest secret (resolved at cold start; overrides ingestSecret). */
+  ingestSecretArn?: string;
+  /** Secrets Manager ARN holding a seed from which demo persona tokens are derived (hosted demo for judges). */
+  demoTokenSeedArn?: string;
   store: 'memory' | 'file' | 'dynamo';
   tableName?: string;
   dataFile: string;
@@ -22,6 +27,8 @@ export interface HubConfig {
   seedDemo: boolean;
   demoHouseholdId: string;
   demoTimezone: string;
+  /** Absolute URL of the caregiver's recorded Pause message (optional). */
+  demoPauseVideoUrl?: string;
 }
 
 function json<T>(raw: string | undefined, fallback: T): T {
@@ -49,17 +56,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
         }
       : undefined;
 
+  const ingestSecretArn = env.INGEST_SECRET_ARN || undefined;
   const ingestSecret = env.INGEST_SECRET ?? (authMode === 'dev' ? 'dev-ingest-secret' : '');
-  if (!ingestSecret) throw new Error('INGEST_SECRET is required outside dev mode');
+  if (!ingestSecret && !ingestSecretArn) throw new Error('INGEST_SECRET or INGEST_SECRET_ARN is required outside dev mode');
 
+  const isLambda = !!env.AWS_LAMBDA_FUNCTION_NAME;
   return {
     port,
-    publicBaseUrl: (env.PUBLIC_BASE_URL ?? `http://localhost:${port}`).replace(/\/$/, ''),
+    publicBaseUrl: (env.PUBLIC_BASE_URL ?? (isLambda ? undefined : `http://localhost:${port}`))?.replace(/\/$/, ''),
     authMode,
     cognito,
     userDirectory: json(env.USER_DIRECTORY, {}),
     deviceTokens: json(env.DEVICE_TOKENS, {}),
     ingestSecret,
+    ingestSecretArn,
+    demoTokenSeedArn: env.DEMO_TOKEN_SEED_ARN || undefined,
     store: (env.STORE ?? (env.TABLE_NAME ? 'dynamo' : 'file')) as HubConfig['store'],
     tableName: env.TABLE_NAME,
     dataFile: env.DATA_FILE ?? '.kinwise-data/state.json',
@@ -70,11 +81,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
       .filter(Boolean),
     wwwAuthenticate: env.MCP_WWW_AUTHENTICATE === 'on',
     conciergeUrl: env.CONCIERGE_URL ?? (authMode === 'dev' ? 'http://localhost:8081' : undefined),
-    conciergeRuntimeArn: env.CONCIERGE_RUNTIME_ARN,
+    conciergeRuntimeArn: env.CONCIERGE_RUNTIME_ARN || undefined,
     devRoutes: env.DEV_ROUTES ? env.DEV_ROUTES === 'true' : authMode === 'dev',
     seedDemo: env.SEED_DEMO ? env.SEED_DEMO === 'true' : true,
     demoHouseholdId: env.DEMO_HOUSEHOLD_ID ?? DEMO_HOUSEHOLD_ID,
     demoTimezone: env.DEMO_TIMEZONE ?? 'America/New_York',
+    demoPauseVideoUrl: env.DEMO_PAUSE_VIDEO_URL || undefined,
   };
 }
 

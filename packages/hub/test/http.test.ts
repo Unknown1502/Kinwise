@@ -265,3 +265,50 @@ describe('Fire TV API', () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe('hosted-mode hardening', () => {
+  const hosted = {
+    AUTH_MODE: 'cognito',
+    COGNITO_USER_POOL_ID: 'us-east-1_AbCdEfGhI',
+    COGNITO_CLIENT_IDS: 'client-a',
+    INGEST_SECRET: 'hosted-secret',
+    DEV_ROUTES: 'true',
+    AWS_LAMBDA_FUNCTION_NAME: 'kinwise-hub',
+  };
+
+  it('requires a household token for demo helpers outside dev mode', async () => {
+    const { app } = await makeApp(hosted);
+    const res = await app.fetch(new Request('https://abc.execute-api.us-east-1.amazonaws.com/dev/visitor', { method: 'POST' }));
+    expect(res.status).toBe(401);
+  });
+
+  it('does not accept dev tokens outside dev mode', async () => {
+    const { app } = await makeApp(hosted);
+    const res = await app.fetch(
+      new Request('https://abc.execute-api.us-east-1.amazonaws.com/tv/state', { headers: { authorization: 'Bearer dev-tv' } }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('derives the resource URL from the request on Lambda', async () => {
+    const { app } = await makeApp(hosted);
+    const res = await app.fetch(new Request('https://abc.execute-api.us-east-1.amazonaws.com/.well-known/oauth-protected-resource'));
+    expect(await res.json()).toMatchObject({
+      resource: 'https://abc.execute-api.us-east-1.amazonaws.com/mcp',
+      authorization_servers: ['https://cognito-idp.us-east-1.amazonaws.com/us-east-1_AbCdEfGhI'],
+    });
+  });
+});
+
+describe('demo tokens', () => {
+  it('derives stable, persona-specific tokens from a seed', async () => {
+    const { deriveDemoToken, demoTokenIdentities } = await import('../src/auth/secrets.js');
+    const a = deriveDemoToken('seed-1', 'asha');
+    expect(a).toMatch(/^kw_asha_[A-Za-z0-9_-]{32}$/);
+    expect(deriveDemoToken('seed-1', 'asha')).toBe(a);
+    expect(deriveDemoToken('seed-2', 'asha')).not.toBe(a);
+    const ids = demoTokenIdentities('seed-1', 'hh-asha');
+    expect(ids[a]).toMatchObject({ role: 'resident', householdId: 'hh-asha' });
+    expect(ids[deriveDemoToken('seed-1', 'tv')]?.role).toBe('device');
+  });
+});

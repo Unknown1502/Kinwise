@@ -1,0 +1,31 @@
+{
+  "name": "@kinwise/infra",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AWS CDK app for Kinwise: hub on Lambda + API Gateway, DynamoDB, Cognito (Alexa+ two-tier OAuth), SNS, AgentCore Runtime for the concierge",
+  "license": "Apache-2.0",
+  "bin": {
+    "kinwise-infra": "bin/kinwise.ts"
+  },
+  "scripts": {
+    "synth": "cdk synth",
+    "deploy": "cdk deploy --require-approval broadening",
+    "diff": "cdk diff",
+    "destroy": "cdk destroy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.220.0",
+    "constructs": "^10.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "aws-cdk": "^2.1030.0",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

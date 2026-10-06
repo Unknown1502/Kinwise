@@ -60,6 +60,8 @@ export class ValidationError extends Error {
 
 export const ALERT_MINUTES: Record<Alert['kind'], number> = { pause: 30, gentle: 30, expected: 3 };
 
+const CONSENT_KEYS = ['scamScreening', 'doorAwareness', 'caregiverAlerts', 'shareTimelineWithCaregiver'] as const;
+
 export interface ScreeningView {
   mode: 'reminder' | 'check';
   level: RiskLevel;
@@ -380,6 +382,22 @@ export class KinwiseService {
     });
   }
 
+  /** Quietly clear an "expected visitor" toast once the TV has shown it (no timeline noise). */
+  async acknowledgeAlert(actor: Identity, alertId: string): Promise<void> {
+    this.requireResident(actor);
+    await this.mutate(actor.householdId, (s, now) => {
+      const alert = s.alerts.find((a) => a.id === alertId);
+      if (!alert) throw new NotFoundError('No such alert');
+      if (alert.kind !== 'expected') throw new ValidationError('Only expected-visitor notices can be acknowledged silently');
+      if (alert.status === 'active') {
+        alert.status = 'resolved';
+        alert.resolution = 'dismiss';
+        alert.resolvedAt = now.toISOString();
+        alert.resolvedBy = actor.userId;
+      }
+    });
+  }
+
   async markMessageRead(actor: Identity, messageId: string): Promise<void> {
     this.requireResident(actor);
     await this.mutate(actor.householdId, (s, now) => {
@@ -393,12 +411,17 @@ export class KinwiseService {
 
   async updateConsent(actor: Identity, patch: Partial<Omit<Consent, 'onboardedAt'>> & { onboarded?: boolean }): Promise<Consent> {
     this.requireResident(actor);
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new ValidationError('Settings must be an object');
+    const { onboarded, ...rest } = patch;
+    const updates: Partial<Consent> = {};
+    for (const [k, v] of Object.entries(rest)) {
+      if (!CONSENT_KEYS.includes(k as (typeof CONSENT_KEYS)[number])) throw new ValidationError(`Unknown setting "${k}"`);
+      if (typeof v !== 'boolean') throw new ValidationError(`${k} must be true or false`);
+      updates[k as (typeof CONSENT_KEYS)[number]] = v;
+    }
+    if (onboarded !== undefined && typeof onboarded !== 'boolean') throw new ValidationError('onboarded must be true or false');
     return this.mutate(actor.householdId, (s, now) => {
-      const { onboarded, ...rest } = patch;
-      for (const [k, v] of Object.entries(rest)) {
-        if (typeof v !== 'boolean') throw new ValidationError(`${k} must be true or false`);
-      }
-      s.consent = { ...s.consent, ...rest };
+      s.consent = { ...s.consent, ...updates };
       if (onboarded) s.consent.onboardedAt ??= now.toISOString();
       addTimeline(s, now, 'consent_changed', `${resident(s).name} updated Kinwise settings.`);
       return s.consent;
@@ -441,6 +464,8 @@ export class KinwiseService {
       if (action === 'call_family') {
         message = `Calling ${caregiverName} now.`;
         addTimeline(s, now, 'alert_resolved', `${residentName} chose "Call ${caregiverName}".`);
+        // The TV acts through its device identity; voice requests come from the resident on the Echo.
+        const surface = actor.role === 'device' ? 'the TV' : 'the Echo Show';
         for (const c of caregivers(s)) {
           pending.notices.push({
             householdId: s.household.id,
@@ -448,7 +473,7 @@ export class KinwiseService {
             caregiverName: c.name,
             kind: 'call_request',
             title: `${residentName} wants to talk to you now`,
-            body: `${residentName} pressed "Call ${c.name}" on the TV during a Kinwise Pause. Please call now.`,
+            body: `${residentName} chose "Call ${c.name}" on ${surface} during a Kinwise Pause. Please call now.`,
             at: now.toISOString(),
           });
         }

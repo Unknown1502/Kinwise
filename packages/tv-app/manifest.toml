@@ -1,0 +1,138 @@
+#
+# Kinwise for Fire TV (Vega OS) app manifest.
+# Adapted from AmazonAppDev/react-native-multi-tv-app-sample apps/vega/manifest.toml
+# (Copyright Amazon.com, Inc. or its affiliates. SPDX-License-Identifier: MIT-0).
+#
+# Kinwise plays one short, non-DRM family video (the caregiver's Pause message), reads the
+# remote, talks to the Kinwise hub over the network and supports VoiceView. The sample's
+# DRM, Content Launcher and Vega Media Controls entries are intentionally removed.
+#
+schema-version = 1
+
+[package]
+title = "Kinwise"
+version = "0.1.0"
+id = "com.kinwise.tv"
+
+[os.version]
+min = "1.2"
+target = "1.2"
+
+[components]
+[[components.interactive]]
+id = "com.kinwise.tv.main"
+runtime-module = "/com.amazon.kepler.keplerscript.runtime.loader_2@IKeplerScript_2_0"
+launch-type = "singleton"
+categories = [
+    "com.amazon.category.main",
+    "com.amazon.category.kepler.media"
+]
+
+## ------------------------------------------------------------------------------
+## Processes
+## ------------------------------------------------------------------------------
+[processes]
+[[processes.group]]
+component-ids = ["com.kinwise.tv.main"]
+
+## ------------------------------------------------------------------------------
+## Wants - Optional capabilities
+## ------------------------------------------------------------------------------
+[wants]
+# ------------------------------------------------------------------------------
+# Remote button events (D-pad, Select, Back)
+# ------------------------------------------------------------------------------
+[[wants.service]]
+id = "com.amazon.inputd.service"
+
+# ------------------------------------------------------------------------------
+# MediaPlayer/MediaTransform (W3C media VideoPlayer for the family Pause video)
+# ------------------------------------------------------------------------------
+[[wants.service]]
+id = "com.amazon.media.server"
+
+[[wants.service]]
+id = "com.amazon.mediametrics.service"
+
+[[wants.service]]
+id = "com.amazon.mediabuffer.service"
+
+[[wants.service]]
+id = "com.amazon.mediatransform.service"
+
+# ------------------------------------------------------------------------------
+# Required for GIPC SR - audio video playback
+# ------------------------------------------------------------------------------
+[[wants.service]]
+id = "com.amazon.gipc.uuid.*"
+
+# ------------------------------------------------------------------------------
+# Audio stream, volume and other audio controls
+# ------------------------------------------------------------------------------
+[[wants.service]]
+id = "com.amazon.audio.stream"
+
+[[wants.service]]
+id = "com.amazon.audio.control"
+
+[[wants.service]]
+id = "com.amazon.audio.system"
+
+# ------------------------------------------------------------------------------
+# Network information (hub polling)
+# ------------------------------------------------------------------------------
+[[wants.service]]
+id = "com.amazon.network.service"
+
+# ------------------------------------------------------------------------------
+# Accessibility (VoiceView announcements, screen-reader state)
+# ------------------------------------------------------------------------------
+[[wants.privilege]]
+id = "com.amazon.devconf.privilege.accessibility"
+
+## ------------------------------------------------------------------------------
+## Needs - Required capabilities
+## ------------------------------------------------------------------------------
+[needs]
+# ------------------------------------------------------------------------------
+# Media playback
+# ------------------------------------------------------------------------------
+[[needs.privilege]]
+id = "com.amazon.media.secureplayback"
+
+# ------------------------------------------------------------------------------
+# Network information
+# ------------------------------------------------------------------------------
+[[needs.privilege]]
+id = "com.amazon.network.privilege.net-info"
+
+# ------------------------------------------------------------------------------
+# Vega OS version
+# ------------------------------------------------------------------------------
+[[needs.module]]
+id = "/com.amazon.vega.os@IVega_1_2"
+
+## ------------------------------------------------------------------------------
+## Offers
+## ------------------------------------------------------------------------------
+[offers]
+# Required for GIPC SR
+[[offers.service]]
+id = "com.amazon.gipc.uuid.*"
+
+[[offers.interaction]]
+id = "com.kinwise.tv.main"
+
+[[offers.module]]
+id = "/com.kinwise.tv.main@IMod1"
+includes-messages = [
+    "pkg://com.kinwise.tv.main"
+]
+
+## ------------------------------------------------------------------------------
+## Message
+## ------------------------------------------------------------------------------
+[[message]]
+uri = "pkg://com.kinwise.tv.main"
+sender-privileges = ["*"]
+receiver-privileges = ["self"]

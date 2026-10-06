@@ -4,7 +4,7 @@ import { cors } from 'hono/cors';
 import { AuthError, PermissionError, SCOPES, hasScope, type Identity } from '../auth/identity.js';
 import type { TokenVerifier } from '../auth/verify.js';
 import type { HubConfig } from '../config.js';
-import type { AlertAction, VisitorEvent } from '../domain/types.js';
+import type { AlertAction, Recurrence, VisitorEvent } from '../domain/types.js';
 import { buildMcpServer, SERVER_VERSION } from '../mcp/server.js';
 import { KinwiseService, NotFoundError, ValidationError } from '../services/kinwise.js';
 import type { OutboxNotifier } from '../services/notifier.js';
@@ -80,12 +80,15 @@ export function createApp(deps: AppDeps): Hono<Env> {
     return c.json({ error: 'server_error', error_description: 'Something went wrong' }, 500);
   });
 
+  /** Public origin: configured, or derived from the request (API Gateway / Lambda Function URL). */
+  const baseUrl = (c: Context) => config.publicBaseUrl ?? new URL(c.req.url).origin;
+
   const unauthorized = (c: Context, description: string) => {
     // Alexa+ does not use WWW-Authenticate on 401 and discovers metadata at /.well-known instead (spec §6.1).
     if (config.wwwAuthenticate) {
       c.header(
         'WWW-Authenticate',
-        `Bearer resource_metadata="${config.publicBaseUrl}/.well-known/oauth-protected-resource", error="invalid_token"`,
+        `Bearer resource_metadata="${baseUrl(c)}/.well-known/oauth-protected-resource", error="invalid_token"`,
       );
     }
     return c.json({ error: 'invalid_token', error_description: description }, 401);
@@ -107,8 +110,8 @@ export function createApp(deps: AppDeps): Hono<Env> {
 
   const prm = (c: Context) =>
     c.json({
-      resource: `${config.publicBaseUrl}/mcp`,
-      authorization_servers: config.cognito ? [config.cognito.issuer] : [`${config.publicBaseUrl}/dev-auth`],
+      resource: `${baseUrl(c)}/mcp`,
+      authorization_servers: config.cognito ? [config.cognito.issuer] : [`${baseUrl(c)}/dev-auth`],
       scopes_supported: [SCOPES.service, SCOPES.tools, SCOPES.resources],
       bearer_methods_supported: ['header'],
       resource_name: 'Kinwise',
@@ -163,6 +166,16 @@ export function createApp(deps: AppDeps): Hono<Env> {
     if (!ALERT_ACTIONS.includes(action)) throw new ValidationError('Unknown action');
     return c.json(await service.respondToAlert(c.get('identity'), c.req.param('id'), action));
   });
+  tv.post('/alerts/:id/seen', async (c) => {
+    await service.acknowledgeAlert(c.get('identity'), c.req.param('id'));
+    return c.json({ ok: true });
+  });
+  // "I know this person" → remember them: the resident adds an expected visit from the TV.
+  tv.post('/visits', async (c) => {
+    const body = await c.req.json<{ label?: string; recurrence?: Recurrence }>();
+    if (!body?.label || !body.recurrence) throw new ValidationError('label and recurrence are required');
+    return c.json(await service.addExpectedVisit(c.get('identity'), { label: body.label, recurrence: body.recurrence }));
+  });
   tv.post('/proposals/:id', async (c) => {
     const { decision } = await c.req.json<{ decision: 'approve' | 'decline' }>();
     if (decision !== 'approve' && decision !== 'decline') throw new ValidationError('decision must be approve or decline');
@@ -216,12 +229,22 @@ export function createApp(deps: AppDeps): Hono<Env> {
       token: bearer(c)!,
       sessionId: sessionId ?? `${auth.userId}-${Date.now()}`,
       householdTimezone: await service.timezoneOf(auth.householdId),
+      hubMcpUrl: `${baseUrl(c)}/mcp`,
     });
     return c.json(out);
   });
 
   // ── Dev-only helpers for the local demo ──
   if (config.devRoutes) {
+    // Outside dev auth mode (the hosted demo) the helpers still require a household token.
+    if (config.authMode !== 'dev') {
+      app.use('/dev/*', async (c, next) => {
+        const auth = await authenticate(c);
+        if (auth instanceof Response) return auth;
+        if (auth.role === 'service') throw new PermissionError('Demo helpers need a household token');
+        await next();
+      });
+    }
     app.get('/dev/notices', (c) => c.json({ notices: deps.outbox?.outbox ?? [] }));
     app.post('/dev/reset', async (c) => {
       await deps.resetDemo?.();

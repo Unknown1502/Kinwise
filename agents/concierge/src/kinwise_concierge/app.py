@@ -35,16 +35,17 @@ async def handle(payload: dict[str, Any]) -> dict[str, Any]:
         return {"error": "bad_request", "reply": f"Sorry, I couldn't understand that request ({err}).", "toolCalls": []}
 
     try:
+        hub_url = req.hub_mcp_url or settings.hub_mcp_url
         if settings.mode == "offline":
-            resp = await answer_offline(req, settings.hub_mcp_url)
+            resp = await answer_offline(req, hub_url)
         else:
             try:
-                resp = await asyncio.to_thread(answer_bedrock, req, settings)
+                resp = await asyncio.to_thread(answer_bedrock, req, settings, hub_url)
             except _FALLBACK_ERRORS as err:
                 if settings.mode == "bedrock":
                     raise
                 log.warning("Bedrock unavailable (%s); using the offline router", type(err).__name__)
-                resp = await answer_offline(req, settings.hub_mcp_url)
+                resp = await answer_offline(req, hub_url)
     except Exception:  # noqa: BLE001 — the Echo screen must always get a calm answer
         log.exception("concierge failed")
         resp = AskResponse(

@@ -1,0 +1,9 @@
+{
+  "extends": "@tsconfig/react-native/tsconfig.json",
+  "compilerOptions": {
+    "types": ["jest", "@amazon-devices/react-native-kepler"] /* Override "jest", "react-native" from @tsconfig/react-native */
+  },
+  "include": ["src/**/*", "test/**/*"],
+  /* *.web.* files are bundled only by the browser preview (Vite + react-native-web) and use DOM types. */
+  "exclude": ["node_modules", "build", "src/**/*.web.ts", "src/**/*.web.tsx"]
+}

@@ -1,4 +1,5 @@
-import { SCOPES, type Identity } from './auth/identity.js';
+import type { Identity } from './auth/identity.js';
+import { demoTokenIdentities, readSecret } from './auth/secrets.js';
 import { ChainVerifier, CognitoTokenVerifier, StaticTokenVerifier, devTokens, type TokenVerifier } from './auth/verify.js';
 import type { HubConfig } from './config.js';
 import { AgentCoreConcierge, HttpConcierge, type ConciergeClient } from './http/concierge.js';
@@ -10,7 +11,19 @@ import { DynamoStore } from './store/dynamo.js';
 import { MemoryStore } from './store/memory.js';
 import type { Store } from './store/store.js';
 
-export async function bootstrap(config: HubConfig) {
+/** Resolve Secrets Manager references once per cold start. */
+async function resolveSecrets(config: HubConfig): Promise<{ config: HubConfig; demoIdentities: Record<string, Identity> }> {
+  const resolved = { ...config };
+  if (config.ingestSecretArn) resolved.ingestSecret = await readSecret(config.ingestSecretArn);
+  const demoIdentities = config.demoTokenSeedArn
+    ? demoTokenIdentities(await readSecret(config.demoTokenSeedArn), config.demoHouseholdId)
+    : {};
+  return { config: resolved, demoIdentities };
+}
+
+export async function bootstrap(input: HubConfig) {
+  const { config, demoIdentities } = await resolveSecrets(input);
+
   const store: Store =
     config.store === 'dynamo'
       ? new DynamoStore(config.tableName ?? (() => { throw new Error('TABLE_NAME is required for STORE=dynamo'); })())
@@ -30,11 +43,11 @@ export async function bootstrap(config: HubConfig) {
   let verifier: TokenVerifier;
   if (config.authMode === 'cognito' && config.cognito) {
     verifier = new ChainVerifier([
-      new StaticTokenVerifier(deviceTokens),
+      new StaticTokenVerifier({ ...deviceTokens, ...demoIdentities }),
       new CognitoTokenVerifier(config.cognito, config.userDirectory, config.demoHouseholdId),
     ]);
   } else {
-    verifier = new StaticTokenVerifier({ ...devTokens(config.demoHouseholdId), ...deviceTokens });
+    verifier = new StaticTokenVerifier({ ...devTokens(config.demoHouseholdId), ...deviceTokens, ...demoIdentities });
   }
 
   const concierge: ConciergeClient | undefined = config.conciergeRuntimeArn
@@ -43,20 +56,19 @@ export async function bootstrap(config: HubConfig) {
       ? new HttpConcierge(config.conciergeUrl)
       : undefined;
 
-  const seed = () => demoHousehold(new Date(), config.demoTimezone);
+  const seed = () => {
+    const fresh = demoHousehold(new Date(), config.demoTimezone, config.demoPauseVideoUrl);
+    return { ...fresh, household: { ...fresh.household, id: config.demoHouseholdId } };
+  };
   if (config.seedDemo && !(await service.exists(config.demoHouseholdId))) {
-    await service.createHousehold({ ...seed(), household: { ...seed().household, id: config.demoHouseholdId } });
+    await service.createHousehold(seed());
   }
 
   const resetDemo = async () => {
-    const fresh = seed();
     const current = await store.load(config.demoHouseholdId);
-    const next = { ...fresh, household: { ...fresh.household, id: config.demoHouseholdId }, version: (current?.version ?? 0) + 1 };
-    await store.save(next, current?.version ?? 0);
+    await store.save({ ...seed(), version: (current?.version ?? 0) + 1 }, current?.version ?? 0);
   };
 
   const app = createApp({ config, service, verifier, concierge, outbox, resetDemo });
   return { app, service, store, outbox, verifier };
 }
-
-export { SCOPES };

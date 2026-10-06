@@ -1,0 +1,9 @@
+{
+  "app": "npx tsx bin/kinwise.ts",
+  "watch": { "include": ["bin/**", "lib/**"] },
+  "context": {
+    "@aws-cdk/aws-lambda-nodejs:useLatestRuntimeVersion": true,
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/aws-iam:minimizePolicies": true
+  }
+}

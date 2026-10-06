@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 Persona = Literal["resident", "caregiver"]
 
@@ -19,6 +21,7 @@ class AskRequest:
     token: str
     session_id: str
     timezone: str
+    hub_mcp_url: str | None = None
 
     @staticmethod
     def parse(payload: dict[str, Any]) -> AskRequest:
@@ -39,7 +42,32 @@ class AskRequest:
             token=token,
             session_id=str(payload.get("sessionId") or "default")[:128],
             timezone=str(payload.get("householdTimezone") or "America/New_York"),
+            hub_mcp_url=_safe_hub_url(payload.get("hubMcpUrl")),
         )
+
+
+def _allowed_host(host: str) -> bool:
+    extra = [h.strip().lower() for h in os.getenv("ALLOWED_HUB_HOSTS", "").split(",") if h.strip()]
+    host = host.lower()
+    return (
+        host in {"localhost", "127.0.0.1"}
+        or (host.endswith(".amazonaws.com") and ".execute-api." in host)
+        or any(host == h or host.endswith("." + h.lstrip(".")) for h in extra)
+    )
+
+
+def _safe_hub_url(value: Any) -> str | None:
+    """The user's token is sent to this URL, so accept only our hub: HTTPS API Gateway / allow-listed hosts or localhost."""
+    if not isinstance(value, str) or not value:
+        return None
+    url = urlparse(value)
+    host = url.hostname or ""
+    local = host in {"localhost", "127.0.0.1"}
+    if url.path.rstrip("/") != "/mcp" or not host or (url.scheme != "https" and not (local and url.scheme == "http")):
+        raise BadRequest("hubMcpUrl must be an https URL ending in /mcp")
+    if not _allowed_host(host):
+        raise BadRequest("hubMcpUrl host is not allowed (set ALLOWED_HUB_HOSTS)")
+    return value
 
 
 @dataclass

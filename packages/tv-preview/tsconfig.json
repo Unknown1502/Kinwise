@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "moduleSuffixes": [".web", ""],
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["vite/client", "vitest/globals"],
+    "baseUrl": ".",
+    "paths": {
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "react-dom": ["./node_modules/@types/react-dom"],
+      "react-dom/*": ["./node_modules/@types/react-dom/*"],
+      "react-native": ["./node_modules/@types/react-native"],
+      "react-tv-space-navigation": ["./node_modules/react-tv-space-navigation/dist/index.d.ts"]
+    }
+  },
+  "include": ["src", "test", "vite.config.ts", "../tv-app/src", "../tv-app/test"],
+  "exclude": ["node_modules", "dist", "../tv-app/src/**/*.vega.ts", "../tv-app/src/**/*.vega.tsx"]
+}

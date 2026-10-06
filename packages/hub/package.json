@@ -20,6 +20,7 @@
   "dependencies": {
     "@aws-sdk/client-bedrock-agentcore": "^3.900.0",
     "@aws-sdk/client-dynamodb": "^3.900.0",
+    "@aws-sdk/client-secrets-manager": "^3.1146.0",
     "@aws-sdk/client-sns": "^3.900.0",
     "@aws-sdk/lib-dynamodb": "^3.900.0",
     "@hono/node-server": "^1.19.0",

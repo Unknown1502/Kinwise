@@ -7,6 +7,8 @@ export interface ConciergeRequest {
   token: string;
   sessionId: string;
   householdTimezone: string;
+  /** This hub's public MCP endpoint, so the concierge needs no static configuration of it. */
+  hubMcpUrl: string;
 }
 
 export interface ConciergeClient {

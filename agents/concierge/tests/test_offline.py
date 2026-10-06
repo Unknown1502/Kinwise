@@ -118,3 +118,21 @@ def test_system_prompt_has_local_time_and_persona_rules():
     assert "2026-10-08T10:15:00-04:00" in p and "Thursday" in p
     assert "kinwise_check_call" in p
     assert "kinwise_get_day_timeline" in system_prompt("caregiver", "America/New_York", NOW)
+
+
+def test_hub_url_validation():
+    base = {"persona": "resident", "text": "hi", "token": "t"}
+    assert AskRequest.parse({**base, "hubMcpUrl": "https://abc.execute-api.us-east-1.amazonaws.com/mcp"}).hub_mcp_url
+    assert AskRequest.parse({**base, "hubMcpUrl": "http://localhost:8787/mcp"}).hub_mcp_url == "http://localhost:8787/mcp"
+    assert AskRequest.parse(base).hub_mcp_url is None
+    for bad in ("http://evil.example/mcp", "https://evil.example/steal", "ftp://localhost/mcp", "https://evil.example/mcp"):
+        with pytest.raises(BadRequest):
+            AskRequest.parse({**base, "hubMcpUrl": bad})
+
+
+def test_hub_url_allowlist(monkeypatch):
+    base = {"persona": "resident", "text": "hi", "token": "t", "hubMcpUrl": "https://hub.kinwise.app/mcp"}
+    with pytest.raises(BadRequest):
+        AskRequest.parse(base)
+    monkeypatch.setenv("ALLOWED_HUB_HOSTS", "kinwise.app")
+    assert AskRequest.parse(base).hub_mcp_url == "https://hub.kinwise.app/mcp"

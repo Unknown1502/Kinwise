@@ -1,0 +1,14 @@
+*.iml
+*.swp
+.idea
+.DS_Store
+.vscode
+.tmp
+
+# Vega build output and local installs (built on the Ubuntu machine with the Vega SDK)
+build/
+dist/
+node_modules/
+buildinfo.json
+CMakeUserPresets.json
+npm-debug.log
