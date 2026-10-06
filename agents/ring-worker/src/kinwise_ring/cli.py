@@ -43,7 +43,7 @@ def _describe(settings: Settings) -> str:
 
 
 def _wire(settings: Settings) -> tuple[Any, Any, Any]:
-    from .frames import FrameGrabber
+    from .browser_frames import make_grabber
     from .hub_client import HubClient
     from .perception import build_perception
     from .pipeline import VisitorPipeline
@@ -56,7 +56,7 @@ def _wire(settings: Settings) -> tuple[Any, Any, Any]:
         household_id=settings.household_id,
         hub=hub,
         perception=build_perception(settings.perception_mode, settings.perception_model_id, settings.aws_region),
-        grabber=FrameGrabber(ring),
+        grabber=make_grabber(ring, settings),
         watermark_crop=settings.watermark_crop,
     )
     return ring, hub, pipeline
@@ -158,18 +158,25 @@ async def cmd_simulate(settings: Settings, args: argparse.Namespace) -> int:
 
 
 async def _fetch_snapshot(settings: Settings, device_id: str, method: str) -> bytes | None:
-    from .frames import FrameGrabber
+    from .browser_frames import make_grabber
+    from .errors import RingApiError
     from .ring_api import RingClient
     from .tokens import build_token_provider
 
     data: bytes | None = None
     async with RingClient(build_token_provider(settings), settings.ring_api_base) as ring:
         if method in ("auto", "stored"):
-            data = await ring.download_image(device_id)
+            try:
+                data = await ring.download_image(device_id)
+            except RingApiError as err:
+                # The real Playground answers 403 "Cannot authorize: empty request body" (verified 2026-10-06).
+                if method == "stored":
+                    raise
+                log.info("stored image unavailable (%s); using live view", err)
             if data is None:
-                log.info("no stored image (HTTP 416 on the Playground)")
+                log.info("no stored image; using live view")
         if data is None and method in ("auto", "live"):
-            data = await FrameGrabber(ring).grab_jpeg(device_id)
+            data = await make_grabber(ring, settings).grab_jpeg(device_id)
     return data
 
 

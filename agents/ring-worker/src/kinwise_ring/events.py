@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any, Literal
 
@@ -197,11 +197,33 @@ def parse_device(item: Mapping[str, Any]) -> RingDevice | None:
     return RingDevice(id=device_id, name=name, kind=kind, online=_online(flat), raw=dict(item))
 
 
+def _included_status(payload: Any, item: Mapping[str, Any]) -> bool | None:
+    """Real API (verified 2026-10-06): JSON:API, with `relationships.status.data.id` pointing at a
+    `device-status` resource in `included` whose attributes carry `online`."""
+    if not isinstance(payload, dict):
+        return None
+    rel = (item.get("relationships") or {}).get("status") or {}
+    status_id = (rel.get("data") or {}).get("id") if isinstance(rel, dict) else None
+    for inc in payload.get("included") or []:
+        if isinstance(inc, dict) and inc.get("type") == "device-status" and inc.get("id") == status_id:
+            online = (inc.get("attributes") or {}).get("online")
+            return online if isinstance(online, bool) else None
+    return None
+
+
 def parse_devices(payload: Any) -> list[RingDevice]:
     items = extract_items(payload)
     if not items and isinstance(payload, dict) and payload.get("id"):
         items = [payload]
-    return [d for d in (parse_device(i) for i in items) if d is not None]
+    devices = []
+    for item in items:
+        device = parse_device(item)
+        if device is None:
+            continue
+        if device.online is None and isinstance(item, Mapping):
+            device = replace(device, online=_included_status(payload, item))
+        devices.append(device)
+    return devices
 
 
 def classify(event_type: str, sub_type: str | None) -> EventClass:

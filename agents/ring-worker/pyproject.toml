@@ -12,6 +12,7 @@ dependencies = [
     "fastapi>=0.115",
     "httpx>=0.28",
     "pillow>=11",
+    "playwright>=1.63.0",
     "python-dotenv>=1.0",
     "uvicorn>=0.30",
 ]

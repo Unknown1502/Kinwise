@@ -52,10 +52,19 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
 - **Workaround:** sample a frame over WHEP and describe it neutrally with Nova 2 Lite.
 - **Suggestion:** expose Video Descriptions (opt-in) and a "speak to the resident" chime action.
 
-### 8. Ring Developer Playground: webhooks and stored media unclear (🟡, reported, to verify)
-- **Reported by other participants:** the Playground event history logs only live-view (`on_demand`) events, snapshot download returns HTTP 416, and webhook delivery is unclear. Tokens last about 30 minutes.
-- **Our design:** a live-view sampling mode (`kinwise-ring live`) plus a signed-webhook receiver for linked devices.
-- **To do:** reproduce with our own Playground token and record exact responses here.
+### 8. Ring Developer Playground: stored media and Python WebRTC decoding (🟠, first-hand, 2026-10-06, from India)
+- **Task:** get one still frame of the Playground doorbell from a Python backend, then run privacy-preserving perception on it.
+- **Steps and actual results:**
+  1. `GET /v1/devices?include=status,capabilities` → 200. The response is **JSON:API**: devices in `data[]`, with `device-status` (`online: true`) and `device-capabilities` (video codec `AVC`, 1080p, 16:9) in `included[]`, linked by `relationships.*.data.id`. The docs examples didn't make this shape obvious, so our first parser showed status as unknown.
+  2. `GET /v1/history/devices/{id}/events` → 200 `{"data": []}` on a fresh Playground.
+  3. `POST /v1/devices/{id}/media/image/download` with no body → **403 `REQUEST_FORBIDDEN` "Cannot authorize: empty request body"**. The required body isn't documented in the API reference we used.
+  4. `POST …/media/streaming/whep/sessions` → **201**. The answer offers H.264 `profile-level-id=42001f;packetization-mode=1` with RTX, plus Opus. **aiortc** (Python) received RTP but **never decoded a frame** (every packet failed with `AVERROR_INVALIDDATA`), in both transceiver orders, even waiting 45 s.
+  5. The same WHEP flow in **headless Edge** (Playwright, audio `sendrecv` first, like Amazon's `ring-api-helloworld`) → **1280×720 frame in 2.5 s**.
+- **Expected:** the image download works with a documented body, or returns 416 when no image is stored; live view decodes in common WebRTC stacks.
+- **Minutes lost:** ~35.
+- **Workaround:** `BrowserFrameGrabber` (headless Edge/Chrome via Playwright, no browser download) is now the default frame source (`FRAME_GRABBER=browser`). Snapshot falls back from stored image to live view automatically.
+- **Suggestion:** document the image-download request body and the JSON:API response shapes with full examples. Offer a "single snapshot" endpoint for partners who only need one frame. Provide a server-side (non-browser) live-view example.
+- **Still to verify:** whether Playground simulations deliver webhooks. Tokens last 30 minutes, which makes long demos fiddly.
 
 ### 9. MCP Apps cards are ~230 KB each (🟡, first-hand)
 - **Actual:** `@modelcontextprotocol/ext-apps` pulls zod and the core SDK into every single-file card.

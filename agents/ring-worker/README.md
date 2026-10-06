@@ -61,6 +61,8 @@ Run the hub first (`npm run dev:hub` at the repo root; it listens on `http://loc
 
 The Playground has no webhooks, and its event history only logs live-view (`on_demand`) events. The reliable path is therefore to open a WHEP live view every `LIVE_EVERY_SECONDS`, grab one frame and run perception. When a person is present and `PERSON_COOLDOWN_SECONDS` have passed since the last reported person, the worker sends a visitor event (`source: "ring-playground"`, `eventId: live-{deviceId}-{epochSeconds}`). Pick the Package, Vehicle or Motion scene in the Playground to change what the camera sees.
 
+**How the frame is decoded (verified against the real Playground, 2026-10-06).** Ring's live view is WHEP with H.264 baseline plus RTX. The default `FRAME_GRABBER=browser` lets headless **Edge or Chrome** decode it through Playwright: an installed browser is used (`BROWSER_CHANNEL=msedge|chrome`), nothing is downloaded, and a 1280×720 frame arrives in about 2.5 s. The pure-Python `FRAME_GRABBER=aiortc` path negotiates the session but could not decode the Playground's H.264 (see `docs/friction-log.md` #8). The frame stays in memory, is cropped above the watermark band, described neutrally, and discarded.
+
 ```bash
 # Git Bash
 RING_TOKEN_FILE=ring-token.txt PERCEPTION_MODE=bedrock uv run kinwise-ring live

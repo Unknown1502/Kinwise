@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -41,6 +42,10 @@ class Settings:
     perception_model_id: str = DEFAULT_MODEL_ID
     aws_region: str = "us-east-1"
     watermark_crop: float = 0.15
+    # "browser" decodes Ring's live view in headless Edge/Chrome (verified against the Playground 2026-10-06);
+    # "aiortc" is pure Python but could not decode the Playground's H.264 stream.
+    frame_grabber: str = "browser"
+    browser_channel: str = "msedge"
 
     state_dir: Path = field(default_factory=lambda: Path(".kinwise-data"))
 
@@ -116,6 +121,8 @@ class Settings:
             perception_model_id=text("PERCEPTION_MODEL_ID", DEFAULT_MODEL_ID) or DEFAULT_MODEL_ID,
             aws_region=text("AWS_REGION") or text("AWS_DEFAULT_REGION") or "us-east-1",
             watermark_crop=crop,
+            frame_grabber=(text("FRAME_GRABBER", "browser") or "browser").lower(),
+            browser_channel=text("BROWSER_CHANNEL", "msedge" if sys.platform == "win32" else "chrome") or "msedge",
             state_dir=Path(text("STATE_DIR", ".kinwise-data") or ".kinwise-data"),
         )
 
