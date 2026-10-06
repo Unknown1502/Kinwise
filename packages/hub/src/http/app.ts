@@ -1,7 +1,8 @@
-import { createMcpHandler, type AuthInfo } from '@modelcontextprotocol/server';
+import { createMcpHandler } from '@modelcontextprotocol/server';
+import { TokenError, protectedResourceMetadata, withAlexaPlusAuth } from 'alexa-plus-mcp-kit';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
-import { AuthError, PermissionError, SCOPES, hasScope, type Identity } from '../auth/identity.js';
+import { AuthError, PermissionError, type Identity } from '../auth/identity.js';
 import type { TokenVerifier } from '../auth/verify.js';
 import type { HubConfig } from '../config.js';
 import type { AlertAction, Recurrence, VisitorEvent } from '../domain/types.js';
@@ -25,20 +26,6 @@ export interface AppDeps {
 type Env = { Variables: { identity: Identity } };
 
 const ALERT_ACTIONS: AlertAction[] = ['call_family', 'known_person', 'dismiss'];
-
-/** JSON-RPC method → Alexa+ two-tier scope (spec §6.1). */
-export function requiredScope(method: string): string {
-  if (method === 'tools/call') return SCOPES.tools;
-  if (method === 'resources/read' || method === 'resources/subscribe' || method === 'resources/unsubscribe') return SCOPES.resources;
-  return SCOPES.service;
-}
-
-function methodsOf(body: unknown): string[] {
-  const msgs = Array.isArray(body) ? body : [body];
-  return msgs
-    .map((m) => (m && typeof m === 'object' && 'method' in m ? String((m as { method: unknown }).method) : ''))
-    .filter(Boolean);
-}
 
 function bearer(c: Context): string | undefined {
   const h = c.req.header('authorization');
@@ -109,48 +96,33 @@ export function createApp(deps: AppDeps): Hono<Env> {
   app.get('/health', (c) => c.json({ ok: true, service: 'kinwise-hub', version: SERVER_VERSION }));
 
   const prm = (c: Context) =>
-    c.json({
-      resource: `${baseUrl(c)}/mcp`,
-      authorization_servers: config.cognito ? [config.cognito.issuer] : [`${baseUrl(c)}/dev-auth`],
-      scopes_supported: [SCOPES.service, SCOPES.tools, SCOPES.resources],
-      bearer_methods_supported: ['header'],
-      resource_name: 'Kinwise',
-      resource_documentation: 'https://github.com/kinwise-app/kinwise#alexa-mcp-add-on',
-    });
+    c.json(
+      protectedResourceMetadata({
+        resource: `${baseUrl(c)}/mcp`,
+        authorizationServers: config.cognito ? [config.cognito.issuer] : [`${baseUrl(c)}/dev-auth`],
+        resourceName: 'Kinwise',
+        documentation: 'https://github.com/kinwise-app/kinwise#alexa-mcp-add-on',
+      }),
+    );
   app.get('/.well-known/oauth-protected-resource', prm);
   app.get('/.well-known/oauth-protected-resource/mcp', prm);
 
-  // ── MCP (Streamable HTTP, stateless) ──
-  app.all('/mcp', async (c) => {
-    const started = performance.now();
-    const origin = c.req.header('origin');
-    if (origin && !allowed.has(origin)) {
-      return c.json({ jsonrpc: '2.0', error: { code: -32600, message: 'Origin not allowed' }, id: null }, 403);
-    }
-    const auth = await authenticate(c);
-    if (auth instanceof Response) return auth;
-
-    let parsedBody: unknown;
-    if (c.req.method === 'POST') {
+  // ── MCP (Streamable HTTP, stateless) — Alexa+ auth contract via alexa-plus-mcp-kit ──
+  const mcpRoute = withAlexaPlusAuth<{ identity: Identity }>(mcp.fetch, {
+    allowedOrigins: [...allowed],
+    wwwAuthenticate: config.wwwAuthenticate,
+    resourceMetadataUrl: (req) => `${config.publicBaseUrl ?? new URL(req.url).origin}/.well-known/oauth-protected-resource`,
+    verifyToken: async (token) => {
       try {
-        parsedBody = await c.req.json();
-      } catch {
-        return c.json({ jsonrpc: '2.0', error: { code: -32700, message: 'Parse error' }, id: null }, 400);
+        const identity = await verifier.verify(token);
+        return { subject: identity.userId, scopes: identity.scopes, extra: { identity } };
+      } catch (err) {
+        if (err instanceof AuthError) throw new TokenError(err.message, err.status);
+        throw err;
       }
-      for (const method of methodsOf(parsedBody)) {
-        const scope = requiredScope(method);
-        if (!hasScope(auth, scope)) {
-          return c.json({ error: 'insufficient_scope', error_description: `${method} requires ${scope}`, scope }, 403);
-        }
-      }
-    }
-
-    const authInfo: AuthInfo = { token: bearer(c)!, clientId: auth.userId, scopes: auth.scopes, extra: { identity: auth } };
-    const res = await mcp.fetch(c.req.raw, { authInfo, parsedBody });
-    const headers = new Headers(res.headers);
-    headers.set('server-timing', `mcp;dur=${(performance.now() - started).toFixed(1)}`);
-    return new Response(res.body, { status: res.status, headers });
+    },
   });
+  app.all('/mcp', (c) => mcpRoute(c.req.raw));
 
   // ── Fire TV API ──
   const tv = new Hono<Env>();

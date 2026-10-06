@@ -4,6 +4,7 @@
   "description": "Kinwise: a consent-first family safety net across Alexa+, Ring and Fire TV",
   "license": "Apache-2.0",
   "workspaces": [
+    "packages/alexa-plus-mcp-kit",
     "packages/hub",
     "infra"
   ],

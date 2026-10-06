@@ -36,6 +36,7 @@ On ordinary days the TV is Asha's calm **Today at Home** board: expected visitor
 | **Ring** | [`agents/ring-worker`](agents/ring-worker) | The official **Ring Partner API** (`api.amazonvision.com`). It lists devices, polls event history, grabs a frame over a **WHEP live-view** session (aiortc), and runs a **signed-webhook** receiver (HMAC, `request_id` dedupe, 200 within 5 s). It works on the **Ring Developer Playground** or a linked device. Perception (Nova 2 Lite) reports presence and a neutral description only, never identity. |
 | **Fire TV** | [`packages/tv-app`](packages/tv-app) | A **React Native for Vega** app (Vega OS, `com.kinwise.tv`). D-pad-first 10-foot UI: onboarding and consent, Today at Home, the Pause, gentle and expected overlays, settings and access log, plus VoiceView announcements and caption-first video. [`packages/tv-preview`](packages/tv-preview) renders the same `src/` in a browser for development. |
 | **AWS Builder** | [`infra/`](infra), [`agents/concierge`](agents/concierge) | **Bedrock AgentCore Runtime** (concierge) + **AgentCore Memory**, **Strands Agents** (Bedrock model + MCP client + hooks), **Amazon Nova 2 Lite** (dialogue and vision), Lambda (ARM64) + API Gateway, **Cognito** (Alexa+ two-tier OAuth), DynamoDB, SNS, Secrets Manager, X-Ray. All CDK, all tested. |
+| **Open Source** | [`packages/alexa-plus-mcp-kit`](packages/alexa-plus-mcp-kit) | **`alexa-plus-mcp-kit`**: a new Apache-2.0 library that makes any MCP SDK v2 server follow the Alexa+ add-on auth contract (two-tier scopes, RFC 9728, Alexa-style 401, Origin 403). It includes an `alexa-mcp-conformance` CLI that any Alexa+ track team can run. The Kinwise hub uses it in production code (16/16 checks). |
 
 **The model never makes safety decisions.** The scam signals, risk windows and the door decision are deterministic and explainable, and they are unit-tested ([`packages/hub/src/domain`](packages/hub/src/domain), spec §5). AI does two things only: it talks with people kindly, and it describes what the camera sees, neutrally.
 
@@ -102,6 +103,7 @@ With AWS credentials that can call Bedrock, drop `--offline` and the concierge u
 | Check | Command |
 |---|---|
 | MCP conformance (22 checks, incl. Alexa+ auth tiers and latency) | `npm run conformance -w @kinwise/hub` |
+| Generic Alexa+ conformance CLI (open-source kit) | `node packages/alexa-plus-mcp-kit/dist/cli.js --url http://localhost:8787/mcp --token dev-asha --service-token dev-service` |
 | All JS/TS tests | `npm test` (root), plus `npm test` in `packages/echo-sim` and `packages/tv-preview` |
 | Python tests | `uv run pytest -q` in `agents/concierge` and `agents/ring-worker` |
 
@@ -125,6 +127,7 @@ Details: [`infra/README.md`](infra/README.md).
 
 ```
 packages/hub          rules engine · MCP server (+ MCP Apps cards) · Fire TV API · ingestion   (TypeScript)
+packages/alexa-plus-mcp-kit  open-source Alexa+ MCP auth kit + conformance CLI                 (TypeScript, Apache-2.0)
 packages/echo-sim     Echo Show simulator: MCP client + MCP Apps host                          (React)
 packages/tv-app       Fire TV app for Vega OS                                                  (React Native for Vega)
 packages/tv-preview   browser preview of tv-app                                                (react-native-web)
