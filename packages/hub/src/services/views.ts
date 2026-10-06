@@ -173,7 +173,11 @@ export function todayView(state: HouseholdState, now: Date, includeReminders: bo
 export function timelineView(state: HouseholdState, day: Date, residentName: string): TimelineView {
   const tz = state.household.timezone;
   const date = zonedParts(day, tz).date;
+  // The timeline is stored newest-first; reverse before the (stable) sort so entries written in the
+  // same instant keep the order they happened in (e.g. "unexpected visitor" before "Pause shown").
   const entries = state.timeline
+    .slice()
+    .reverse()
     .filter((e) => zonedParts(new Date(e.at), tz).date === date)
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   const count = (k: TimelineEntry['kind']) => entries.filter((e) => e.kind === k).length;

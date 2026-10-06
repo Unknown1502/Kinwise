@@ -83,6 +83,10 @@ describe('KinwiseService — hero story', () => {
     expect(tl.summary).toMatchObject({ pausesShown: 1, unexpectedVisitors: 1, flaggedCalls: 1 });
     expect(text).not.toMatch(/FTC|gold|accounts are compromised/i);
     expect(text).toMatch(/chose "Call Priya"/);
+    // Same-instant entries keep causal order: the visitor arrives, then the Pause is shown.
+    const kinds = tl.entries.map((e) => e.kind);
+    expect(kinds.indexOf('visitor_unexpected')).toBeLessThan(kinds.indexOf('pause_shown'));
+    expect(kinds.at(-1)).toBe('alert_resolved');
   });
 
   it('never stores the words of a checked call (privacy rule 3)', async () => {

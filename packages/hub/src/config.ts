@@ -69,7 +69,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
       .map((s) => s.trim())
       .filter(Boolean),
     wwwAuthenticate: env.MCP_WWW_AUTHENTICATE === 'on',
-    conciergeUrl: env.CONCIERGE_URL ?? (authMode === 'dev' ? 'http://localhost:8080' : undefined),
+    conciergeUrl: env.CONCIERGE_URL ?? (authMode === 'dev' ? 'http://localhost:8081' : undefined),
     conciergeRuntimeArn: env.CONCIERGE_RUNTIME_ARN,
     devRoutes: env.DEV_ROUTES ? env.DEV_ROUTES === 'true' : authMode === 'dev',
     seedDemo: env.SEED_DEMO ? env.SEED_DEMO === 'true' : true,

@@ -13,7 +13,7 @@ export interface ConciergeClient {
   ask(req: ConciergeRequest): Promise<unknown>;
 }
 
-/** Local dev: the Strands concierge runs on http://localhost:8080 (AgentCore-compatible /invocations). */
+/** Local dev: the Strands concierge runs on http://localhost:8081 (AgentCore-compatible /invocations; 8080 inside the container). */
 export class HttpConcierge implements ConciergeClient {
   constructor(private readonly baseUrl: string) {}
 
