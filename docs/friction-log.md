@@ -64,7 +64,8 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
 - **Minutes lost:** ~35.
 - **Workaround:** `BrowserFrameGrabber` (headless Edge/Chrome via Playwright, no browser download) is now the default frame source (`FRAME_GRABBER=browser`). Snapshot falls back from stored image to live view automatically.
 - **Suggestion:** document the image-download request body and the JSON:API response shapes with full examples. Offer a "single snapshot" endpoint for partners who only need one frame. Provide a server-side (non-browser) live-view example.
-- **Still to verify:** whether Playground simulations deliver webhooks. Tokens last 30 minutes, which makes long demos fiddly.
+- **Likely root cause of the aiortc failure:** the Playground's own API explorer, negotiating from a browser, gets an answer with **H.264 High profile (`profile-level-id=64001f`, pt 118)**. Our aiortc offer only listed baseline profiles, and Ring answered `42001f`, but the camera most likely kept sending its native High-profile stream. A WHEP server that answers a profile it then doesn't send would explain why every packet failed to decode. *(Inferred, not confirmed.)*
+- **Still to verify:** whether Playground simulations deliver webhooks. Whether a second live-view session is refused while the Playground's own live view is open (one of our grabs got no frame while the explorer had a session running). Tokens last 30 minutes, which makes long demos fiddly.
 
 ### 9. MCP Apps cards are ~230 KB each (🟡, first-hand)
 - **Actual:** `@modelcontextprotocol/ext-apps` pulls zod and the core SDK into every single-file card.
