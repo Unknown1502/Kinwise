@@ -128,12 +128,13 @@ Auth follows the Alexa+ two-tier model:
 
 ### 6.2 Fire TV API (bearer device token)
 
-- `GET /tv/state` → `{household, today, activeAlert, riskWindow, pendingProposals, messages, consent, accessLog}`
-- `POST /tv/alerts/:id/respond {action}`
+- `GET /tv/state` → `{household, resident, caregiver, today, activeAlert, pendingProposals, consent, privacyHourUntil, accessLog, serverTime}`. Here `today` carries the date and time labels, `reminders`, `visits`, `messages` and `safety` (the risk window level and "until" label).
+- `POST /tv/alerts/:id/respond {action: call_family|known_person|dismiss}`
+- `POST /tv/alerts/:id/seen` quietly clears an *expected-visitor* notice (no timeline entry)
+- `POST /tv/visits {label, recurrence}`: the resident remembers a visitor ("I know this person")
 - `POST /tv/proposals/:id {decision: approve|decline}`
-- `POST /tv/consent {…partial consent}`
-- `POST /tv/privacy-hour {minutes}`
-- `POST /tv/messages/:id/read`
+- `POST /tv/consent {scamScreening?, doorAwareness?, caregiverAlerts?, shareTimelineWithCaregiver?, onboarded?}`. Unknown keys are rejected.
+- `POST /tv/privacy-hour {minutes}` · `POST /tv/messages/:id/read` · `POST /tv/safety/close`
 
 ### 6.3 Event ingestion (HMAC `X-Kinwise-Signature: sha256=<hex>` over the raw body)
 
@@ -141,7 +142,7 @@ Auth follows the Alexa+ two-tier model:
 
 ### 6.4 Simulator bridge
 
-- `POST /sim/ask {persona, text}` forwards to the concierge: the local URL in dev, `InvokeAgentRuntime` on AWS.
+- `POST /sim/ask {text, sessionId}` (bearer = the speaker's token) forwards `{persona, text, token, sessionId, householdTimezone, hubMcpUrl}` to the concierge: `http://localhost:8081/invocations` in dev, `InvokeAgentRuntime` on AWS.
 
 ## 7. Privacy rules (enforced in code, shown in the UI)
 
