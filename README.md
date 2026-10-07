@@ -111,7 +111,7 @@ Any MCP Apps host can use the server. For example, add `http://localhost:8787/mc
 
 **Ring Developer Playground:** paste a Playground token into `agents/ring-worker/ring-token.txt`, then run `node scripts/dev.mjs --ring live`. See [`agents/ring-worker/README.md`](agents/ring-worker/README.md).
 
-**Fire TV (Vega OS):** build `packages/tv-app` with the Vega SDK on Ubuntu or macOS and run it in the Vega Virtual Device. See [`packages/tv-app/README.md`](packages/tv-app/README.md).
+**Fire TV (Vega OS):** build `packages/tv-app` with the Vega SDK on Ubuntu, macOS or WSL2 (verified) and run it in the Vega Virtual Device. See [`packages/tv-app/README.md`](packages/tv-app/README.md).
 
 ## Hosted demo (AWS, us-east-1)
 
@@ -158,7 +158,7 @@ scripts               setup · dev · demo scenario · demo tokens
 ## Status and honest limits
 
 - **Alexa+**: participants can't connect to live Alexa+, so the Alexa+ surface is a **simulation** (labelled on screen). The MCP server itself is real, standards-compliant and runnable by judges.
-- **Fire TV**: the Vega SDK doesn't run on Windows. The app mirrors Amazon's Vega sample layout and builds with the Vega SDK on Linux or macOS. The browser preview runs the same `src/`.
+- **Fire TV**: verified on the **Vega Virtual Device** with SDK 0.24 (built in Ubuntu on WSL2, packages for x86_64, armv7 and aarch64). It shows the Pause in seconds when the hosted hub decides. Amazon's SDK doesn't run natively on Windows; see [`packages/tv-app/README.md`](packages/tv-app/README.md) for the WSL2 path. The browser preview runs the same `src/` for fast iteration.
 - **Ring**: built against the official Partner API and the Developer Playground, where webhooks are unconfirmed, so live-view frame sampling is the primary path.
 - Third-party Fire TV apps can't draw over other apps, so the Pause shows while Kinwise is the TV's home screen. The Echo and the family alert are the backup channels.
 
