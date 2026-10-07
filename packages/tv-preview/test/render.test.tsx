@@ -123,6 +123,9 @@ describe('Today at Home', () => {
     const hub = fakeHub(homeState());
     render(<App client={hub.client} />);
     await screen.findByText('Today at Home');
+    // Spatial navigation assigns the initial focus just after mount; pressing Enter before
+    // anything is focused is a no-op, which made this test flaky on fresh installs.
+    await vi.waitFor(() => expect(document.querySelector('[aria-selected="true"]')).not.toBeNull());
     press('Enter');
     await vi.waitFor(() => expect(hub.posts).toContainEqual({path: '/tv/messages/msg_1/read', body: {}}));
   });

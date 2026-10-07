@@ -3,6 +3,7 @@
  *
  *   cd packages/hub && STORE=memory npx tsx src/main.ts
  *   cd packages/echo-sim && KINWISE_HUB_URL=http://localhost:8787 npx vitest run src/lib/hub.e2e.test.ts
+ *   (hosted hub: also set KINWISE_ASHA_TOKEN and KINWISE_PRIYA_TOKEN)
  *
  * Proves the simulator's MCP path end to end: our real MCP client negotiates
  * 2025-11-25, reads the MCP Apps UI resource, and an MCP Apps view's
@@ -17,10 +18,16 @@ import { McpSession } from './mcpSession';
 import { loadConfig } from './personas';
 import type { WireEntry } from './wireLog';
 
-const HUB = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.KINWISE_HUB_URL;
+const ENV = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
+const HUB = ENV.KINWISE_HUB_URL;
 
 describe.skipIf(!HUB)('live hub (MCP client + AppBridge forwarding)', () => {
-  const config = loadConfig({ VITE_HUB_URL: HUB });
+  // Hosted hubs need real persona tokens (KINWISE_ASHA_TOKEN / KINWISE_PRIYA_TOKEN); local dev hubs accept the defaults.
+  const config = loadConfig({
+    VITE_HUB_URL: HUB,
+    VITE_ASHA_TOKEN: ENV.KINWISE_ASHA_TOKEN,
+    VITE_PRIYA_TOKEN: ENV.KINWISE_PRIYA_TOKEN,
+  });
   const wire: WireEntry[] = [];
   const asha = new McpSession(config.hubUrl, config.personas.asha, (e) => wire.push(e));
   const priya = new McpSession(config.hubUrl, config.personas.priya, () => undefined);
@@ -38,7 +45,8 @@ describe.skipIf(!HUB)('live hub (MCP client + AppBridge forwarding)', () => {
     expect(init?.status).toBe(200);
     expect(init?.serverTimingMs).toBeTypeOf('number');
     expect(JSON.stringify(init?.response)).toContain('2025-11-25');
-    expect(init?.requestHeaders?.authorization).toMatch(/^Bearer dev-a…$/);
+    // The wire log must never show a full token: only a short prefix plus an ellipsis.
+    expect(init?.requestHeaders?.authorization).toMatch(/^Bearer \S{1,5}…$/);
   });
 
   it('discovers tool UI metadata and reads the MCP Apps HTML', async () => {
