@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import email.utils
+import json
 import time
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -117,6 +119,85 @@ async def test_download_image_returns_bytes(tokens, sleep):
         return_value=httpx.Response(200, content=jpeg, headers={"content-type": "image/jpeg"})
     )
     assert await client(tokens, sleep).download_image("d1") == jpeg
+
+
+PRESIGNED = "https://media.api.amazonvision.com/v1/download?security_token=abc&X-Amz-Expires=60"
+
+
+def jpeg_ok() -> httpx.Response:
+    return httpx.Response(200, content=make_jpeg(), headers={"content-type": "image/jpeg"})
+
+
+@respx.mock
+async def test_download_image_sends_search_body_and_follows_303_without_bearer(tokens, sleep):
+    jpeg = make_jpeg()
+    post = respx.post(f"{API}/v1/devices/d1/media/image/download").mock(
+        return_value=httpx.Response(303, headers={"Location": PRESIGNED})
+    )
+    get = respx.get(PRESIGNED).mock(
+        return_value=httpx.Response(
+            200, content=jpeg, headers={"content-type": "image/jpeg", "X-Media-Origin": "recording"}
+        )
+    )
+    before_ms = int(time.time() * 1000)
+    assert await client(tokens, sleep).download_image("d1", window_s=600) == jpeg
+
+    req = post.calls.last.request
+    assert req.headers["content-type"] == "application/json"
+    body = json.loads(req.content)
+    assert body["type"] == "latest_in_range"
+    assert before_ms - 600_000 - 5_000 <= body["start_timestamp"] <= before_ms - 600_000 + 5_000
+    assert "end_timestamp" not in body
+    assert body["image_options"] == {"format": "jpeg", "resolution": {"width": 1280, "height": 720}}
+    assert "authorization" not in get.calls.last.request.headers
+
+
+@respx.mock
+async def test_download_image_at_timestamp(tokens, sleep):
+    post = respx.post(f"{API}/v1/devices/d1/media/image/download").mock(
+        return_value=httpx.Response(303, headers={"Location": PRESIGNED})
+    )
+    respx.get(PRESIGNED).mock(return_value=jpeg_ok())
+    when = datetime(2026, 10, 7, 12, 0, tzinfo=UTC)
+    await client(tokens, sleep).download_image("d1", at=when)
+    body = json.loads(post.calls.last.request.content)
+    assert body["type"] == "at_timestamp"
+    assert body["timestamp"] == int(when.timestamp() * 1000)
+
+
+@pytest.mark.parametrize("status", [416, 425])
+@respx.mock
+async def test_download_image_no_media_at_presigned_step_means_none(tokens, sleep, status):
+    respx.post(f"{API}/v1/devices/d1/media/image/download").mock(
+        return_value=httpx.Response(303, headers={"Location": PRESIGNED})
+    )
+    respx.get(PRESIGNED).mock(return_value=httpx.Response(status, json={"errors": [{"code": "MEDIA_NOT_FOUND"}]}))
+    assert await client(tokens, sleep).download_image("d1") is None
+
+
+@respx.mock
+async def test_download_image_accepts_the_real_playground_presigned_host(tokens, sleep):
+    real = "https://download-ap-northeast-1.prod.phoenix.devices.amazon.dev/v1/download?security_token=abc"
+    respx.post(f"{API}/v1/devices/d1/media/image/download").mock(
+        return_value=httpx.Response(303, headers={"Location": real})
+    )
+    get = respx.get(real).mock(return_value=jpeg_ok())
+    assert await client(tokens, sleep).download_image("d1")
+    assert "authorization" not in get.calls.last.request.headers
+
+
+@respx.mock
+async def test_download_image_refuses_untrusted_presigned_location(tokens, sleep):
+    respx.post(f"{API}/v1/devices/d1/media/image/download").mock(
+        return_value=httpx.Response(303, headers={"Location": "https://evil.example/x.jpg"})
+    )
+    with pytest.raises(RingApiError, match="untrusted"):
+        await client(tokens, sleep).download_image("d1")
+
+
+async def test_download_image_rejects_window_over_24_hours(tokens, sleep):
+    with pytest.raises(ValueError):
+        await client(tokens, sleep).download_image("d1", window_s=25 * 3600)
 
 
 @respx.mock

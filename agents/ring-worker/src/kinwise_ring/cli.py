@@ -169,7 +169,7 @@ async def _fetch_snapshot(settings: Settings, device_id: str, method: str) -> by
             try:
                 data = await ring.download_image(device_id)
             except RingApiError as err:
-                # The real Playground answers 403 "Cannot authorize: empty request body" (verified 2026-10-06).
+                # e.g. 403 when the token's consent date is after the requested window.
                 if method == "stored":
                     raise
                 log.info("stored image unavailable (%s); using live view", err)

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import email.utils
+import json
 import logging
 import time
 from collections.abc import Awaitable, Callable, Iterable
@@ -31,6 +32,10 @@ Sleep = Callable[[float], Awaitable[None]]
 MAX_RETRY_AFTER_S = 30.0
 MAX_RATE_LIMIT_ATTEMPTS = 3
 TRUSTED_DOMAINS = ("amazonvision.com", "ring.com")
+# Hosts a pre-signed image URL may point at. No credentials go there. The live Playground
+# answers with download-<region>.prod.phoenix.devices.amazon.dev (verified 2026-10-07),
+# while the docs show media.api.amazonvision.com.
+PRESIGNED_DOMAINS = (*TRUSTED_DOMAINS, "devices.amazon.dev")
 
 
 def _snippet(resp: httpx.Response, limit: int = 300) -> str:
@@ -192,14 +197,52 @@ class RingClient:
     async def delete_whep_session(self, session_url: str) -> None:
         await self._request("DELETE", session_url, allow=(404, 410))
 
-    async def download_image(self, device_id: str) -> bytes | None:
-        """Latest stored image (JPEG/PNG), or None when there is none (416, e.g. on the Playground)."""
+    async def download_image(
+        self,
+        device_id: str,
+        *,
+        at: datetime | None = None,
+        window_s: int = 3600,
+        width: int = 1280,
+        height: int = 720,
+    ) -> bytes | None:
+        """A stored JPEG, or None when the device has none for that time (416/425).
+
+        The endpoint never captures a new image. It is a two-step flow (Ring docs,
+        amazon_vision_api/image_download.md): POST a search body → 303 with a pre-signed
+        `Location` → GET that URL *without* the bearer token. `at` searches ±10 s around a
+        moment; otherwise the latest image of the last `window_s` seconds (≤ 24 h).
+        """
+        if not 0 < window_s <= 24 * 3600:
+            raise ValueError("window_s must be between 1 second and 24 hours")
+        body: dict[str, Any]
+        if at is not None:
+            body = {"type": "at_timestamp", "timestamp": int(at.timestamp() * 1000)}
+        else:
+            body = {"type": "latest_in_range", "start_timestamp": int(time.time() * 1000) - window_s * 1000}
+        body["image_options"] = {"format": "jpeg", "resolution": {"width": width, "height": height}}
         resp = await self._request(
             "POST",
             f"/v1/devices/{quote(device_id, safe='')}/media/image/download",
-            headers={"Accept": "image/jpeg, image/png, */*"},
-            allow=(416,),
+            content=json.dumps(body),
+            headers={"Content-Type": "application/json"},
+            allow=(416, 425),
         )
-        if resp.status_code in (204, 416) or not resp.content:
+        if resp.status_code == 303:
+            location = resp.headers.get("location")
+            if not location:
+                raise RingApiError(303, "image download redirect had no Location header")
+            presigned = urljoin(str(resp.request.url), location)
+            parts = urlsplit(presigned)
+            host = (parts.hostname or "").lower()
+            if parts.scheme != "https" or not any(host == d or host.endswith("." + d) for d in PRESIGNED_DOMAINS):
+                raise RingApiError(0, "refusing to fetch an image from an untrusted pre-signed URL")
+            try:
+                resp = await self._http.get(presigned, headers={"User-Agent": USER_AGENT})
+            except httpx.HTTPError as exc:
+                raise RingApiError(0, f"pre-signed image download failed ({exc.__class__.__name__})") from exc
+            if resp.status_code >= 400 and resp.status_code not in (416, 425):
+                raise RingApiError(resp.status_code, "pre-signed image download failed", _snippet(resp))
+        if resp.status_code in (204, 416, 425) or not resp.content:
             return None
         return resp.content
