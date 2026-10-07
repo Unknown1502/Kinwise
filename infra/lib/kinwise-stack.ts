@@ -30,6 +30,11 @@ export interface KinwiseStackProps extends StackProps {
   demoTimezone: string;
   /** Keep the auth-protected demo helpers (/dev/*) enabled for the judges' walkthrough. */
   devRoutes: boolean;
+  /**
+   * AgentCore Runtime tracing (X-Ray → CloudWatch). Requires X-Ray "Transaction Search" in the account
+   * (trace segment destination = CloudWatch Logs); see infra/README.md. Default true.
+   */
+  tracing?: boolean;
 }
 
 /**
@@ -185,7 +190,7 @@ export class KinwiseStack extends Stack {
           PORT: '8080',
           AGENTCORE_MEMORY_ID: memory.memoryId,
         },
-        tracingEnabled: true,
+        tracingEnabled: props.tracing ?? true,
       });
       concierge.addToRolePolicy(
         new iam.PolicyStatement({

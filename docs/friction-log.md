@@ -74,3 +74,10 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
 ### 10. Stateless MCP servers produce a console error in browser clients (🟡, first-hand)
 - **Actual:** the TS client opens the optional GET SSE stream, and a stateless server correctly answers 405, which still logs a browser console error.
 - **Suggestion:** the client could treat 405 on the GET stream as "not supported" silently.
+
+### 11. AgentCore Runtime tracing fails a first deploy until X-Ray Transaction Search is enabled (🟠, first-hand, 2026-10-07)
+- **Task:** deploy the concierge with the CDK L2 `agentcore.Runtime` and `tracingEnabled: true`.
+- **Actual:** the stack rolled back. `AWS::Logs::Delivery` (Concierge/TracesDelivery) failed with *"X-Ray Delivery Destination is supported with CloudWatch Logs as a Trace Segment Destination. Please enable the CloudWatch Logs destination … UpdateTraceSegmentDestination"*. On a fresh account the X-Ray destination is `XRay`.
+- **Workaround:** a one-time account setup: a CloudWatch Logs resource policy for `xray.amazonaws.com` on `aws/spans`, then `aws xray update-trace-segment-destination --destination CloudWatchLogs`, then wait for `ACTIVE`. Tracing is now also a deploy flag (`-c tracing=false`).
+- **Minutes lost:** ~15, plus a rollback cycle.
+- **Suggestion:** have the CDK construct (or `agentcore` CLI) check the destination at synth/deploy time and say how to enable it, or enable Transaction Search as part of the construct.

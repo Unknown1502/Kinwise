@@ -37,3 +37,6 @@ Thumbs.db
 
 # MCP Apps card build output (embedded into src/mcp/ui-bundle.generated.ts)
 packages/hub/ui/dist/
+
+# CDK deploy outputs (account-specific)
+infra/cdk-outputs.json

@@ -22,6 +22,7 @@ const stack = new KinwiseStack(app, 'Kinwise', {
   conciergeModelId: ctx('conciergeModelId', 'us.amazon.nova-2-lite-v1:0'),
   demoTimezone: ctx('demoTimezone', 'America/New_York'),
   devRoutes: ctx('devRoutes', 'true') === 'true',
+  tracing: ctx('tracing', 'true') === 'true',
 });
 
 Tags.of(stack).add('project', 'kinwise');

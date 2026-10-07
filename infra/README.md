@@ -16,6 +16,12 @@ One stack, `Kinwise`, in `us-east-1`:
 - AWS credentials for the target account (`aws sts get-caller-identity`). The CDK must be bootstrapped once: `npx cdk bootstrap`.
 - Bedrock model access to **Amazon Nova 2 Lite** in `us-east-1`. Anthropic models also need a valid payment method, because they're subscribed through AWS Marketplace.
 - `node scripts/setup.mjs` has been run at the repo root.
+- **X-Ray Transaction Search** must be on, because the concierge's AgentCore tracing writes spans to CloudWatch Logs. It is a one-time account setting:
+  ```bash
+  aws logs put-resource-policy --policy-name TransactionSearchXRayAccess --policy-document file://xray-logs-policy.json
+  aws xray update-trace-segment-destination --destination CloudWatchLogs
+  ```
+  The policy allows `xray.amazonaws.com` to `logs:PutLogEvents` on `aws/spans` and `/aws/application-signals/data`. Alternatively, deploy with `-c tracing=false`.
 
 ## Deploy
 
