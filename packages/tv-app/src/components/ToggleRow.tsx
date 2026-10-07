@@ -1,6 +1,6 @@
 import React from 'react';
 import {StyleSheet, Text, View, type ViewStyle} from 'react-native';
-import {colors, s, type} from '../theme/theme';
+import {RADIUS, colors, s, type} from '../theme/theme';
 import {Focusable} from './Focusable';
 
 export interface ToggleRowProps {
@@ -24,18 +24,19 @@ export function ToggleRow({title, explanation, value, busy, onToggle, style}: To
       busy={busy}
       onSelect={() => onToggle(!value)}
       style={style}
-      radius={s(24)}>
+      radius={RADIUS.card}
+      grow={1.015}>
       {(focused) => (
         <View style={[styles.row, focused ? styles.rowFocused : null]}>
           <View style={styles.texts}>
-            <Text style={[type.bodyStrong, focused ? styles.onLight : null]}>{title}</Text>
-            <Text style={[type.small, focused ? styles.onLightMuted : null]}>{explanation}</Text>
+            <Text style={[type.bodyStrong, focused ? styles.onWhite : null]}>{title}</Text>
+            <Text style={[type.small, focused ? styles.onWhiteSoft : null]}>{explanation}</Text>
           </View>
-          <View style={[styles.pill, value ? styles.pillOn : styles.pillOff]}>
-            <View style={[styles.knob, value ? styles.knobOn : styles.knobOff]} />
-            <Text style={[type.smallStrong, {color: value ? colors.onLight : colors.text}]}>
-              {busy ? '…' : value ? 'On' : 'Off'}
-            </Text>
+          <Text style={[type.smallStrong, styles.state, focused ? styles.onWhite : value ? styles.stateOn : null]}>
+            {busy ? '…' : value ? 'On' : 'Off'}
+          </Text>
+          <View style={[styles.track, value ? styles.trackOn : focused ? styles.trackOffOnWhite : styles.trackOff]}>
+            <View style={[styles.knob, value ? styles.knobOn : focused ? styles.knobOffOnWhite : styles.knobOff]} />
           </View>
         </View>
       )}
@@ -43,41 +44,65 @@ export function ToggleRow({title, explanation, value, busy, onToggle, style}: To
   );
 }
 
+const TRACK_W = s(108);
+const TRACK_H = s(58);
+const KNOB = s(42);
+
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface2,
-    borderRadius: s(24),
-    paddingVertical: s(22),
-    paddingHorizontal: s(32),
+    borderRadius: RADIUS.card,
+    backgroundColor: colors.glass,
+    paddingVertical: s(20),
+    paddingHorizontal: s(30),
   },
   rowFocused: {
-    backgroundColor: colors.cream,
+    backgroundColor: colors.white,
   },
   texts: {
     flex: 1,
     paddingRight: s(32),
   },
-  onLight: {color: colors.onLight},
-  onLightMuted: {color: '#3b4a3f'},
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minWidth: s(150),
-    paddingVertical: s(10),
-    paddingHorizontal: s(18),
-    borderRadius: s(999),
-    borderWidth: s(2),
+  onWhite: {color: colors.deep},
+  onWhiteSoft: {color: colors.onSheetSoft},
+  state: {
+    width: s(64),
+    textAlign: 'right',
+    marginRight: s(18),
   },
-  pillOn: {backgroundColor: colors.ok, borderColor: colors.ok},
-  pillOff: {backgroundColor: colors.surface, borderColor: colors.muted},
+  stateOn: {
+    color: colors.mint,
+  },
+  track: {
+    width: TRACK_W,
+    height: TRACK_H,
+    borderRadius: TRACK_H / 2,
+    borderWidth: s(3),
+    justifyContent: 'center',
+    paddingHorizontal: s(5),
+  },
+  trackOn: {
+    backgroundColor: colors.mint,
+    borderColor: colors.mint,
+    alignItems: 'flex-end',
+  },
+  trackOff: {
+    backgroundColor: 'transparent',
+    borderColor: colors.soft,
+    alignItems: 'flex-start',
+  },
+  trackOffOnWhite: {
+    backgroundColor: 'transparent',
+    borderColor: colors.onSheetSoft,
+    alignItems: 'flex-start',
+  },
   knob: {
-    width: s(26),
-    height: s(26),
-    borderRadius: s(13),
-    marginRight: s(12),
+    width: KNOB,
+    height: KNOB,
+    borderRadius: KNOB / 2,
   },
-  knobOn: {backgroundColor: colors.onLight},
-  knobOff: {backgroundColor: colors.muted},
+  knobOn: {backgroundColor: colors.deep},
+  knobOff: {backgroundColor: colors.soft},
+  knobOffOnWhite: {backgroundColor: colors.onSheetSoft},
 });

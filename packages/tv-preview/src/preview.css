@@ -1,11 +1,38 @@
 /* Chrome around the fake 1920×1080 TV. The app itself is styled by react-native-web. */
+
+/* The app's bundled typeface: one family name per weight, the same names Vega resolves. */
+@font-face {
+  font-family: 'AtkinsonHyperlegibleNext-Light';
+  src: url('../../tv-app/assets/fonts/AtkinsonHyperlegibleNext-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-display: block;
+}
+@font-face {
+  font-family: 'AtkinsonHyperlegibleNext-Regular';
+  src: url('../../tv-app/assets/fonts/AtkinsonHyperlegibleNext-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-display: block;
+}
+@font-face {
+  font-family: 'AtkinsonHyperlegibleNext-Bold';
+  src: url('../../tv-app/assets/fonts/AtkinsonHyperlegibleNext-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-display: block;
+}
+@font-face {
+  font-family: 'AtkinsonHyperlegibleNext-ExtraBold';
+  src: url('../../tv-app/assets/fonts/AtkinsonHyperlegibleNext-ExtraBold.ttf') format('truetype');
+  font-weight: 800;
+  font-display: block;
+}
+
 :root {
-  --page: #070b08;
-  --bezel: #020302;
-  --text: #f5f1e8;
-  --muted: #b9c2b5;
-  --cream: #fef3c7;
-  --line: #2c4033;
+  --page: #071922;
+  --bezel: #030b10;
+  --text: #ffffff;
+  --muted: #b7ccd3;
+  --cream: #ffd5ba;
+  --line: #24495a;
 }
 
 html,

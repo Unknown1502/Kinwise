@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: s(24),
     overflow: 'hidden',
-    backgroundColor: colors.surface2,
+    backgroundColor: colors.deep,
   },
   surface: {
     position: 'absolute',

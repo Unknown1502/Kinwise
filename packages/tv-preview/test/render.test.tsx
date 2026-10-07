@@ -87,28 +87,32 @@ describe('theme', () => {
   });
 });
 
-describe('Today at Home', () => {
+describe('home screen', () => {
   it('renders the ambient board from TvStateView', async () => {
     const hub = fakeHub(homeState());
     render(<App client={hub.client} />);
 
-    expect(await screen.findByText('Today at Home')).toBeTruthy();
-    expect(screen.getByText('2:19 PM')).toBeTruthy();
+    expect(await screen.findByTestId('home-screen')).toBeTruthy();
+    // The hero is one accessible header; "PM" is set smaller in its own span.
+    expect(screen.getByLabelText('2:19 PM. Good afternoon, Asha. Monday, October 5.')).toBeTruthy();
+    expect(screen.getByText('Good afternoon, Asha')).toBeTruthy();
     expect(screen.getByText('Monday, October 5')).toBeTruthy();
     expect(screen.getByText('Kinwise is on')).toBeTruthy();
     expect(screen.getByText('Maria (home-health aide)')).toBeTruthy();
+    expect(screen.getByText('Expected now')).toBeTruthy();
     expect(screen.getByText('Courier from the bank at 2 p.m.')).toBeTruthy();
-    expect(screen.getAllByText('checked')).toHaveLength(1);
-    expect(screen.getByText('Love you Mom! Call you tonight.')).toBeTruthy();
+    expect(screen.getAllByText('Kinwise checked this one')).toHaveLength(1);
+    expect(screen.getByText('“Love you Mom! Call you tonight.”')).toBeTruthy();
     expect(screen.getByText('New')).toBeTruthy();
-    expect(screen.getByText('Privacy time · 1 hour')).toBeTruthy();
+    expect(screen.getByText('Priya, 9:15 AM')).toBeTruthy();
+    expect(screen.getByText('Privacy time for an hour')).toBeTruthy();
     expect(screen.getByText('Settings & privacy')).toBeTruthy();
   });
 
   it('labels every focusable element and starts on the first message', async () => {
     const hub = fakeHub(homeState());
     render(<App client={hub.client} />);
-    await screen.findByText('Today at Home');
+    await screen.findByTestId('home-screen');
 
     const focusables = document.querySelectorAll('[data-testid^="focusable:"]');
     expect(focusables.length).toBeGreaterThanOrEqual(4);
@@ -116,13 +120,14 @@ describe('Today at Home', () => {
       expect(el.getAttribute('aria-label'), el.outerHTML.slice(0, 80)).toBeTruthy();
       expect(el.getAttribute('role'), el.getAttribute('aria-label') ?? '').toBeTruthy();
     });
-    expect(isFocused('New message from Priya, 1:02 PM: Love you Mom! Call you tonight.')).toBe(true);
+    // Spatial navigation assigns the initial focus just after mount.
+    await vi.waitFor(() => expect(isFocused('New message from Priya, 1:02 PM: Love you Mom! Call you tonight.')).toBe(true));
   });
 
   it('marks a message read when selected', async () => {
     const hub = fakeHub(homeState());
     render(<App client={hub.client} />);
-    await screen.findByText('Today at Home');
+    await screen.findByTestId('home-screen');
     // Spatial navigation assigns the initial focus just after mount; pressing Enter before
     // anything is focused is a no-op, which made this test flaky on fresh installs.
     await vi.waitFor(() => expect(document.querySelector('[aria-selected="true"]')).not.toBeNull());
@@ -130,11 +135,22 @@ describe('Today at Home', () => {
     await vi.waitFor(() => expect(hub.posts).toContainEqual({path: '/tv/messages/msg_1/read', body: {}}));
   });
 
-  it('shows the amber safety watch pill', async () => {
+  it('shows the safety watch status', async () => {
     const s = homeState();
     const hub = fakeHub({...s, today: {...s.today, safety: {level: 'high', untilLabel: '8:18 PM', signs: []}}});
     render(<App client={hub.client} />);
-    expect(await screen.findByText('Watching the door until 8:18 PM')).toBeTruthy();
+    expect(await screen.findByText('Watching the door closely')).toBeTruthy();
+    expect(screen.getByText("Until 8:18 PM, after today's warning signs")).toBeTruthy();
+  });
+
+  it('shows how much privacy time is left, measured on the hub clock', async () => {
+    const s = homeState();
+    // serverTime is 18:19:11Z; privacy time ends 45 minutes later.
+    const hub = fakeHub({...s, privacyHourUntil: '2026-10-05T19:04:11.527Z', today: {...s.today, privacyHourUntilLabel: '3:04 PM'}});
+    render(<App client={hub.client} />);
+    expect(await screen.findByText('Privacy time')).toBeTruthy();
+    expect(screen.getByText('45 minutes left, until 3:04 PM')).toBeTruthy();
+    expect(screen.getByText('End privacy time')).toBeTruthy();
   });
 
   it('opens Settings & privacy and returns with Back', async () => {
@@ -145,17 +161,17 @@ describe('Today at Home', () => {
       pendingProposals: [{id: 'visit_9', label: 'Sam (plumber)', when: 'Oct 7 9:00 AM–10:00 AM', proposedBy: 'Priya'}],
     });
     render(<App client={hub.client} />);
-    await screen.findByText('Today at Home');
+    await screen.findByTestId('home-screen');
     expect(isFocused('Settings & privacy')).toBe(true);
     press('Enter');
     expect(await screen.findByTestId('settings-screen')).toBeTruthy();
     expect(screen.getByText('What Kinwise may notice')).toBeTruthy();
-    expect(screen.getByText('Sam (plumber) · Oct 7 9:00 AM–10:00 AM')).toBeTruthy();
+    expect(screen.getByText('Sam (plumber), Oct 7 9:00 AM–10:00 AM')).toBeTruthy();
     expect(screen.getByText('Priya viewed today\'s overview')).toBeTruthy();
     expect(screen.getByText('End safety watch')).toBeTruthy();
     expect(screen.getAllByRole('switch')).toHaveLength(4);
     press('Escape');
-    expect(await screen.findByText('Today at Home')).toBeTruthy();
+    expect(await screen.findByTestId('home-screen')).toBeTruthy();
   });
 });
 
@@ -174,7 +190,7 @@ describe('the Pause', () => {
     expect(within(pause).getByText('Someone coming to collect')).toBeTruthy();
     expect(within(pause).getByText('A message from Priya')).toBeTruthy();
     expect(within(pause).getByText(/Real banks and agencies never send couriers/)).toBeTruthy();
-    expect(screen.queryByText('Today at Home')).toBeNull();
+    expect(screen.queryByTestId('home-screen')).toBeNull();
     expect(isFocused('Call Priya')).toBe(true);
     expect(said.said.some((t) => t.startsWith('Pause before you open the door.'))).toBe(true);
     said.stop();
@@ -205,12 +221,12 @@ describe('the Pause', () => {
     const calm = {...s, today: {...s.today, messages: []}};
     const hub = fakeHub(calm);
     render(<App client={hub.client} />);
-    await screen.findByText('Today at Home');
+    await screen.findByTestId('home-screen');
     hub.set(withAlert(calm, pauseAlert()));
     await screen.findByTestId('pause-screen', undefined, {timeout: 4000});
     press('Enter');
     await screen.findByText('Calling Priya now…');
-    expect(await screen.findByText('Today at Home', undefined, {timeout: 7000})).toBeTruthy();
+    expect(await screen.findByTestId('home-screen', undefined, {timeout: 7000})).toBeTruthy();
     expect(isFocused('Settings & privacy')).toBe(true);
     press('Enter');
     expect(await screen.findByTestId('settings-screen')).toBeTruthy();
@@ -226,7 +242,7 @@ describe('the Pause', () => {
     await vi.waitFor(() =>
       expect(hub.posts).toContainEqual({path: '/tv/alerts/alert_pause_1/respond', body: {action: 'known_person'}}),
     );
-    expect(await screen.findByText('Today at Home')).toBeTruthy();
+    expect(await screen.findByTestId('home-screen')).toBeTruthy();
   });
 
   it('Back does not close the Pause', async () => {
@@ -245,7 +261,7 @@ describe('overlays', () => {
     render(<App client={hub.client} />);
     const overlay = await screen.findByTestId('gentle-overlay');
     expect(within(overlay).getByText("A visitor isn't on today's list")).toBeTruthy();
-    expect(screen.getByText('Today at Home')).toBeTruthy();
+    expect(screen.getByTestId('home-screen')).toBeTruthy();
     expect(isFocused('I know this person')).toBe(true);
     // Home's root is inactive under the overlay: exactly one element looks focused.
     expect(document.querySelectorAll('[aria-selected="true"]')).toHaveLength(1);
@@ -261,11 +277,11 @@ describe('overlays', () => {
     vi.useFakeTimers({shouldAdvanceTime: true});
     const hub = fakeHub(withAlert(homeState(), expectedAlert()));
     render(<App client={hub.client} />);
-    expect(await screen.findByText('Luis (gardener) is here — expected')).toBeTruthy();
+    expect(await screen.findByText('Luis (gardener) is at the door')).toBeTruthy();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(8100);
     });
-    expect(screen.queryByText('Luis (gardener) is here — expected')).toBeNull();
+    expect(screen.queryByText('Luis (gardener) is at the door')).toBeNull();
     // The notice is also cleared quietly on the hub (no timeline entry, no family alert).
     expect(hub.posts).toEqual([{path: '/tv/alerts/alert_expected_1/seen', body: {}}]);
   });
@@ -304,7 +320,7 @@ describe('onboarding', () => {
         },
       }),
     );
-    expect(await screen.findByText('Today at Home')).toBeTruthy();
+    expect(await screen.findByTestId('home-screen')).toBeTruthy();
   });
 });
 

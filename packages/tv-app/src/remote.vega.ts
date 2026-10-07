@@ -7,7 +7,7 @@
  * 'select' | 'back' | …, eventKeyAction: 0 (down) | 1 (up) }.
  *
  * Back is handled through BackHandler ('hardwareBackPress'), as in the sample's PlayerScreen,
- * so that when Kinwise does not consume it (e.g. on Today at Home) Vega's default applies.
+ * so that when Kinwise does not consume it (e.g. on the home screen) Vega's default applies.
  *
  * Imported once from index.js before the app registers. The browser preview configures its own
  * keyboard mapping in packages/tv-preview/src/remote.ts.

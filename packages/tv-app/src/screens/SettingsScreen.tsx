@@ -10,10 +10,11 @@ import type {SpatialNavigationNodeRef} from 'react-tv-space-navigation';
 import {announce} from '../a11y/announce';
 import {Focusable} from '../components/Focusable';
 import {FocusButton} from '../components/FocusButton';
+import {IconBadge, type IconName} from '../components/Icon';
 import {ToggleRow} from '../components/ToggleRow';
 import {consentItems} from '../logic/consentCopy';
 import {plural} from '../logic/copy';
-import {SAFE, colors, s, type} from '../theme/theme';
+import {FOCUS, RADIUS, SAFE, colors, s, type} from '../theme/theme';
 import type {ConsentKey, ProposalDecision, TvStateView} from '../types';
 
 export interface SettingsScreenProps {
@@ -54,7 +55,7 @@ export function SettingsScreen({state, active, busyKey, onToggle, onPrivacy, onD
   const firstConfirm = useRef(true);
 
   useEffect(() => {
-    announce('Settings and privacy. Press Back to return to Today at Home.');
+    announce('Settings and privacy. Press Back to return to the home screen.');
   }, []);
 
   useEffect(() => {
@@ -81,16 +82,16 @@ export function SettingsScreen({state, active, busyKey, onToggle, onPrivacy, onD
           <Text style={type.title} accessibilityRole="header">
             Settings & privacy
           </Text>
-          <Text style={type.small}>Back returns to Today at Home</Text>
+          <Text style={type.small}>Press Back to return to the home screen</Text>
         </View>
 
         <SpatialNavigationScrollView offsetFromStart={s(160)} style={styles.scroll}>
           <View style={styles.content}>
             <DefaultFocus>
-              <FocusButton label="Back to Today at Home" onSelect={onBack} style={styles.backButton} />
+              <FocusButton icon="arrow-left" label="Back to the home screen" onSelect={onBack} style={styles.backButton} />
             </DefaultFocus>
 
-            <Section title="What Kinwise may notice">
+            <Section title="What Kinwise may notice" icon="shield-check" color={colors.mint}>
               <SpatialNavigationView direction="vertical">
                 {consentItems(caregiver).map((item) => (
                   <ToggleRow
@@ -106,7 +107,7 @@ export function SettingsScreen({state, active, busyKey, onToggle, onPrivacy, onD
               </SpatialNavigationView>
             </Section>
 
-            <Section title="Privacy time">
+            <Section title="Privacy time" icon="moon" color={colors.lilac}>
               <Text style={[type.body, styles.sectionText]}>
                 {privacyLabel
                   ? `Privacy time is on until ${privacyLabel}. Kinwise isn't noticing the door and keeps no door activity.`
@@ -134,7 +135,7 @@ export function SettingsScreen({state, active, busyKey, onToggle, onPrivacy, onD
               </SpatialNavigationView>
             </Section>
 
-            <Section title="Waiting for your OK">
+            <Section title="Waiting for your OK" icon="calendar-days" color={colors.sun}>
               <SpatialNavigationView direction="vertical">
                 {pendingProposals.length === 0 ? (
                   <Text style={[type.body, styles.sectionText]}>Nothing is waiting for you.</Text>
@@ -142,7 +143,7 @@ export function SettingsScreen({state, active, busyKey, onToggle, onPrivacy, onD
                 {pendingProposals.map((p, index) => (
                   <View key={index} style={styles.proposal}>
                     <View style={styles.proposalText}>
-                      <Text style={type.bodyStrong}>{`${p.label} · ${p.when}`}</Text>
+                      <Text style={type.bodyStrong}>{`${p.label}, ${p.when}`}</Text>
                       <Text style={type.small}>{`Suggested by ${p.proposedBy}. It only counts as expected once you approve it.`}</Text>
                     </View>
                     <SpatialNavigationView direction="horizontal">
@@ -169,7 +170,7 @@ export function SettingsScreen({state, active, busyKey, onToggle, onPrivacy, onD
             {/* Always-present node: the safety section comes and goes with the risk window. */}
             <SpatialNavigationView direction="vertical">
               {watching ? (
-                <Section title="Safety watch" tone="caution">
+                <Section title="Safety watch" icon="shield-alert" color={colors.coral} tone="caution">
                   <Text style={[type.body, styles.sectionText]}>
                     {`Kinwise is watching the door more closely${safety.untilLabel ? ` until ${safety.untilLabel}` : ''}` +
                       (safety.signs.length
@@ -216,7 +217,7 @@ export function SettingsScreen({state, active, busyKey, onToggle, onPrivacy, onD
               )}
             </SpatialNavigationView>
 
-            <Section title="Who has seen my information">
+            <Section title="Who has seen my information" icon="eye" color={colors.soft}>
               <Text style={[type.small, styles.sectionText]}>
                 {`Every time ${caregiver} or anyone else in your family looks at Kinwise, it shows up here.`}
               </Text>
@@ -233,8 +234,8 @@ export function SettingsScreen({state, active, busyKey, onToggle, onPrivacy, onD
                     radius={s(16)}>
                     {(focused) => (
                       <View style={[styles.logRow, focused ? styles.logRowFocused : null]}>
-                        <Text style={[type.smallStrong, styles.logTime, focused ? styles.onLight : null]}>{e.timeLabel}</Text>
-                        <Text style={[type.body, focused ? styles.onLight : null]}>{`${e.actor} ${e.action}`}</Text>
+                        <Text style={[type.smallStrong, styles.logTime]}>{e.timeLabel}</Text>
+                        <Text style={type.body}>{`${e.actor} ${e.action}`}</Text>
                       </View>
                     )}
                   </Focusable>
@@ -248,21 +249,37 @@ export function SettingsScreen({state, active, busyKey, onToggle, onPrivacy, onD
   );
 }
 
-function Section({title, tone, children}: {title: string; tone?: 'caution'; children: React.ReactNode}) {
+function Section({
+  title,
+  icon,
+  color,
+  tone,
+  children,
+}: {
+  title: string;
+  icon: IconName;
+  color: string;
+  tone?: 'caution';
+  children: React.ReactNode;
+}) {
   return (
     <View style={[styles.section, tone === 'caution' ? styles.sectionCaution : null]}>
-      <Text style={[type.section, tone === 'caution' ? styles.cautionTitle : null]} accessibilityRole="header">
-        {title}
-      </Text>
+      <View style={styles.sectionHead}>
+        <IconBadge name={icon} color={color} size={s(60)} />
+        <Text style={[type.heading, styles.sectionTitle, tone === 'caution' ? styles.cautionTitle : null]} accessibilityRole="header">
+          {title}
+        </Text>
+      </View>
       {children}
     </View>
   );
 }
 
+const RING = FOCUS.width + FOCUS.gap;
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.bg,
     paddingHorizontal: SAFE.horizontal,
     paddingTop: SAFE.vertical,
   },
@@ -281,68 +298,78 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignSelf: 'flex-start',
-    marginBottom: s(12),
+    marginLeft: -RING,
+    marginBottom: s(8),
   },
   section: {
-    backgroundColor: colors.surface,
-    borderRadius: s(28),
-    borderWidth: s(2),
-    borderColor: colors.line,
-    paddingVertical: s(28),
-    paddingHorizontal: s(32),
-    marginBottom: s(24),
+    marginTop: s(36),
   },
   sectionCaution: {
-    borderColor: 'rgba(251, 191, 36, 0.6)',
-    backgroundColor: '#1d2318',
+    backgroundColor: 'rgba(255, 138, 101, 0.1)',
+    borderColor: colors.coral,
+    borderWidth: s(2),
+    borderRadius: RADIUS.panel,
+    padding: s(30),
+  },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: s(14),
+  },
+  sectionTitle: {
+    marginLeft: s(20),
   },
   cautionTitle: {
-    color: colors.caution,
+    color: colors.coral,
   },
   sectionText: {
-    marginTop: s(8),
-    marginBottom: s(12),
+    marginTop: s(4),
+    marginBottom: s(14),
+    maxWidth: s(1300),
   },
   confirmText: {
-    color: colors.cream,
     marginBottom: s(8),
   },
   rowGap: {
-    marginBottom: s(2),
+    marginHorizontal: -RING,
+    marginBottom: -s(2),
   },
   buttonRow: {
     flexWrap: 'wrap',
     alignItems: 'center',
+    marginLeft: -RING,
   },
   gap: {
-    marginRight: s(16),
+    marginRight: s(12),
   },
   proposal: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: s(12),
+    marginTop: s(8),
+    backgroundColor: colors.glass,
+    borderRadius: RADIUS.card,
+    paddingVertical: s(18),
+    paddingLeft: s(30),
+    paddingRight: s(18),
   },
   proposalText: {
     flex: 1,
     paddingRight: s(24),
   },
   logOuter: {
-    marginHorizontal: -s(10),
+    marginHorizontal: -RING,
   },
   logRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    paddingVertical: s(10),
-    paddingHorizontal: s(16),
-    borderRadius: s(16),
+    paddingVertical: s(12),
+    paddingHorizontal: s(20),
+    borderRadius: RADIUS.chip,
   },
   logRowFocused: {
-    backgroundColor: colors.cream,
+    backgroundColor: colors.glassStrong,
   },
   logTime: {
     width: s(170),
-  },
-  onLight: {
-    color: colors.onLight,
   },
 });

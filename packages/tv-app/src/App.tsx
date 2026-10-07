@@ -1,10 +1,12 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {StyleSheet, View} from 'react-native';
+import {Image, StyleSheet, View} from 'react-native';
+import backdrop from '../assets/home-bg.png';
 import {SpatialNavigationDeviceTypeProvider} from 'react-tv-space-navigation';
 import {announce} from './a11y/announce';
 import {watchScreenReader} from './a11y/screenReader';
 import {HubClient, HubError} from './api';
 import {Banner} from './components/Banner';
+import {asset} from './components/asset';
 import {getConfig} from './config';
 import {useHubState} from './hooks/useHubState';
 import {useBack} from './input/backBus';
@@ -308,6 +310,7 @@ export function App({client: injected}: AppProps = {}) {
   return (
     <SpatialNavigationDeviceTypeProvider>
       <View style={styles.app}>
+        <Image source={BACKDROP} style={styles.backdrop} resizeMode="cover" accessible={false} />
         {base}
         {gentle ? (
           <GentleOverlay
@@ -337,10 +340,20 @@ export function App({client: injected}: AppProps = {}) {
 
 export default App;
 
+const BACKDROP = asset(backdrop);
+
 const styles = StyleSheet.create({
   app: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.backdrop,
     overflow: 'hidden',
+  },
+  // Vega ignores edge pinning on images: give the backdrop an explicit full size.
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
   },
 });

@@ -2,3 +2,11 @@ Kinwise
 Copyright 2026 The Kinwise authors
 
 This product includes software developed for the Amazon AppDev 2026 hackathon.
+
+This product bundles Atkinson Hyperlegible Next (packages/tv-app/assets/fonts),
+Copyright 2020-2024 The Atkinson Hyperlegible Next Project Authors,
+licensed under the SIL Open Font License, Version 1.1 (see packages/tv-app/assets/fonts/OFL.txt).
+
+This product bundles icons from Lucide (packages/tv-app/assets/icons),
+Copyright (c) Lucide Icons and Contributors, licensed under the ISC License
+(see packages/tv-app/assets/icons/LICENSE-lucide.txt).

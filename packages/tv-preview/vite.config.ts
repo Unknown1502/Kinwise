@@ -20,6 +20,8 @@ export default defineConfig({
   },
   define: {
     __DEV__: JSON.stringify(process.env.NODE_ENV !== 'production'),
+    // react-native-web's Animated reads React Native's `global`.
+    global: 'globalThis',
   },
   // tv-app/tsconfig.json extends @tsconfig/react-native, which only exists on the Vega build machine.
   // A string tsconfigRaw stops esbuild from loading it for files under ../tv-app.

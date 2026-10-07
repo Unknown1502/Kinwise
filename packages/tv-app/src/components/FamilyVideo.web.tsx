@@ -27,7 +27,7 @@ export function FamilyVideo({url, from, style}: FamilyVideoProps) {
         playsInline
         preload="auto"
         onError={() => setFailed(true)}
-        style={{width: '100%', height: '100%', objectFit: 'cover', display: 'block', backgroundColor: colors.surface2}}
+        style={{width: '100%', height: '100%', objectFit: 'cover', display: 'block', backgroundColor: colors.deep}}
       />
     </View>
   );
@@ -39,6 +39,6 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: s(24),
     overflow: 'hidden',
-    backgroundColor: colors.surface2,
+    backgroundColor: colors.deep,
   },
 });

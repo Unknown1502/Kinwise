@@ -3,10 +3,11 @@ import {StyleSheet, Text, View} from 'react-native';
 import {DefaultFocus, SpatialNavigationRoot, SpatialNavigationView} from 'react-tv-space-navigation';
 import {announce} from '../a11y/announce';
 import {FocusButton} from '../components/FocusButton';
+import {IconBadge, type IconName} from '../components/Icon';
 import {ToggleRow} from '../components/ToggleRow';
 import {useBack} from '../input/backBus';
 import {consentItems} from '../logic/consentCopy';
-import {SAFE, colors, s, type} from '../theme/theme';
+import {FOCUS, RADIUS, SAFE, colors, s, type} from '../theme/theme';
 import type {Consent, ConsentKey, TvStateView} from '../types';
 
 export type ConsentDraft = Record<ConsentKey, boolean>;
@@ -79,7 +80,7 @@ export function OnboardingScreen({state, active, busy, error, onFinish}: Onboard
               </Text>
               <SpatialNavigationView direction="horizontal" style={styles.buttons}>
                 <DefaultFocus>
-                  <FocusButton variant="primary" label="Get started" onSelect={() => setStep(1)} />
+                  <FocusButton variant="primary" icon="check" label="Get started" onSelect={() => setStep(1)} />
                 </DefaultFocus>
               </SpatialNavigationView>
             </>
@@ -105,7 +106,7 @@ export function OnboardingScreen({state, active, busy, error, onFinish}: Onboard
                 ))}
               </SpatialNavigationView>
               <SpatialNavigationView direction="horizontal" style={styles.buttonsTight}>
-                <FocusButton label="Back" onSelect={() => setStep(0)} style={styles.gap} />
+                <FocusButton icon="arrow-left" label="Back" onSelect={() => setStep(0)} style={styles.gap} />
                 <FocusButton variant="primary" label="Next" onSelect={() => setStep(2)} />
               </SpatialNavigationView>
             </>
@@ -115,23 +116,27 @@ export function OnboardingScreen({state, active, busy, error, onFinish}: Onboard
             <>
               <View style={styles.facts}>
                 <Fact
+                  icon="eye"
+                  color={colors.mint}
                   heading={`What ${caregiver} may see`}
                   text={`Signals like “An unexpected visitor came at 2:41 PM. The Pause was shown. ${resident} chose Call ${caregiver}.”`}
                 />
-                <Fact heading={`What ${caregiver} never sees`} text="Video, photos, or the words you or a caller said." />
+                <Fact icon="x" color={colors.coral} heading={`What ${caregiver} never sees`} text="Video, photos, or the words you or a caller said." />
                 <Fact
+                  icon="settings"
+                  color={colors.sun}
                   heading="You stay in charge"
                   text={`Change any switch in Settings & privacy, and see every time ${caregiver} looks at your information.`}
                 />
               </View>
               {error ? <Text style={[type.bodyStrong, styles.error]}>{error}</Text> : null}
               <SpatialNavigationView direction="horizontal" style={styles.buttonsTight}>
-                <FocusButton label="Back" onSelect={() => setStep(1)} style={styles.gap} />
+                <FocusButton icon="arrow-left" label="Back" onSelect={() => setStep(1)} style={styles.gap} />
                 <DefaultFocus>
                   <FocusButton
                     variant="primary"
                     label="Finish"
-                    accessibilityHint="Saves your choices and opens Today at Home"
+                    accessibilityHint="Saves your choices and opens the home screen"
                     busy={busy}
                     onSelect={() => onFinish(draft)}
                   />
@@ -145,83 +150,91 @@ export function OnboardingScreen({state, active, busy, error, onFinish}: Onboard
   );
 }
 
-function Fact({heading, text}: {heading: string; text: string}) {
+function Fact({heading, text, icon, color}: {heading: string; text: string; icon: IconName; color: string}) {
   return (
     <View style={styles.fact} accessible accessibilityRole="text" accessibilityLabel={`${heading}. ${text}`}>
+      <IconBadge name={icon} color={color} size={s(64)} style={styles.factHead} />
       <Text style={type.bodyStrong}>{heading}</Text>
       <Text style={[type.body, styles.muted]}>{text}</Text>
     </View>
   );
 }
 
+const RING = FOCUS.width + FOCUS.gap;
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.bg,
     paddingHorizontal: SAFE.horizontal,
     paddingVertical: SAFE.vertical,
-    alignItems: 'center',
     justifyContent: 'center',
   },
   column: {
     width: '100%',
-    maxWidth: s(1440),
+    maxWidth: s(1500),
   },
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: s(24),
+    marginBottom: s(28),
   },
   stepDot: {
-    width: s(18),
-    height: s(18),
-    borderRadius: s(9),
-    marginRight: s(12),
-    backgroundColor: colors.line,
+    width: s(56),
+    height: s(6),
+    borderRadius: s(3),
+    marginRight: s(10),
+    backgroundColor: colors.glassStrong,
   },
   stepDotOn: {
-    backgroundColor: colors.cream,
-    width: s(44),
+    backgroundColor: colors.sun,
   },
   stepText: {
-    marginLeft: s(12),
+    marginLeft: s(14),
   },
   para: {
     marginTop: s(24),
     maxWidth: s(1300),
   },
   muted: {
-    color: colors.muted,
+    color: colors.soft,
   },
   toggles: {
-    marginTop: s(24),
+    marginTop: s(20),
+    marginHorizontal: -RING,
   },
   toggle: {
-    marginBottom: s(4),
+    marginBottom: -s(4),
   },
   buttons: {
     marginTop: s(56),
+    marginLeft: -RING,
   },
   buttonsTight: {
     marginTop: s(28),
+    marginLeft: -RING,
   },
   gap: {
-    marginRight: s(16),
+    marginRight: s(8),
   },
   facts: {
-    marginTop: s(32),
+    flexDirection: 'row',
+    marginTop: s(40),
+    marginBottom: s(16),
   },
   fact: {
-    backgroundColor: colors.surface,
-    borderRadius: s(24),
+    flex: 1,
+    backgroundColor: colors.glass,
+    borderColor: colors.glassLine,
     borderWidth: s(2),
-    borderColor: colors.line,
-    paddingVertical: s(24),
-    paddingHorizontal: s(32),
+    borderRadius: RADIUS.card,
+    padding: s(30),
+    marginRight: s(24),
+  },
+  factHead: {
     marginBottom: s(16),
   },
   error: {
     marginTop: s(8),
-    color: colors.caution,
+    color: colors.coral,
   },
 });

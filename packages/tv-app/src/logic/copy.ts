@@ -9,7 +9,7 @@ export interface StatusPill {
   text: string;
 }
 
-/** The pill in the corner of "Today at Home". Privacy time wins, then the safety watch. */
+/** The one-line status used in VoiceView announcements. Privacy time wins, then the safety watch. */
 export function statusPill(state: Pick<TvStateView, 'today' | 'consent'>): StatusPill {
   const {today, consent} = state;
   if (today.privacyHourUntilLabel) {

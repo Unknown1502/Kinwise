@@ -1,10 +1,11 @@
-import React, {forwardRef, useCallback, useEffect, useState} from 'react';
-import {StyleSheet, View, type AccessibilityRole, type AccessibilityState, type ViewStyle} from 'react-native';
+import React, {forwardRef, useCallback, useEffect, useRef, useState} from 'react';
+import {AccessibilityInfo, Animated, StyleSheet, type AccessibilityRole, type AccessibilityState, type ViewStyle} from 'react-native';
 import {SpatialNavigationFocusableView} from 'react-tv-space-navigation';
 import type {SpatialNavigationNodeRef} from 'react-tv-space-navigation';
 import {announce} from '../a11y/announce';
 import {isScreenReaderOn} from '../a11y/screenReader';
-import {FOCUS, colors, s} from '../theme/theme';
+import {ringColor, useSurface} from '../theme/surface';
+import {FOCUS, s} from '../theme/theme';
 
 export interface FocusableProps {
   /** Read by VoiceView. Required: every focusable element is labelled. */
@@ -22,12 +23,22 @@ export interface FocusableProps {
   style?: ViewStyle;
   /** Corner radius of the content; the ring follows it. */
   radius?: number;
+  /** How much the item grows when focused (1 = not at all). Big targets grow less. */
+  grow?: number;
   children: (focused: boolean) => React.ReactElement;
 }
 
+let reduceMotion = false;
+AccessibilityInfo.isReduceMotionEnabled?.()
+  .then((on) => {
+    reduceMotion = on;
+  })
+  .catch(() => undefined);
+
 /**
- * The single focusable primitive of the app: a react-tv-space-navigation node that draws
- * a thick (6 px) amber focus ring with a 4 px gap, and wires accessibility:
+ * The single focusable primitive of the app: a react-tv-space-navigation node that grows the
+ * focused item slightly and draws a 5 px ring with a 4 px gap (white, or deep on light surfaces),
+ * like Fire TV's own focus. It also wires accessibility:
  * label + role + state on the view, and a spoken label on focus when VoiceView is on
  * (spatial navigation moves a custom focus that screen readers can't see on their own).
  */
@@ -43,15 +54,26 @@ export const Focusable = forwardRef<SpatialNavigationNodeRef, FocusableProps>(fu
     onBlur,
     style,
     radius = s(20),
+    grow = 1.05,
     children,
   },
   ref,
 ) {
+  const surface = useSurface();
   const [focusedInNavigator, setFocused] = useState(false);
   // A root under an overlay keeps its LRUD focus but is inactive: show no ring there, so only
   // one element on screen ever looks (and reports itself) focused.
   const [rootActive, setRootActive] = useState(true);
   const focused = focusedInNavigator && rootActive;
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.timing(scale, {
+      toValue: focused ? grow : 1,
+      duration: reduceMotion ? 0 : 140,
+      useNativeDriver: false,
+    }).start();
+  }, [focused, grow, scale]);
 
   const handleFocus = useCallback(() => {
     setFocused(true);
@@ -96,15 +118,15 @@ export const Focusable = forwardRef<SpatialNavigationNodeRef, FocusableProps>(fu
         testID: `focusable:${accessibilityLabel}`,
       }}>
       {({isFocused, isRootActive}) => (
-        <View
+        <Animated.View
           style={[
             styles.ring,
-            {borderRadius: radius + FOCUS.gap + FOCUS.width},
-            isFocused && isRootActive ? styles.ringOn : null,
+            {borderRadius: radius + FOCUS.gap + FOCUS.width, transform: [{scale}]},
+            isFocused && isRootActive ? {borderColor: ringColor(surface)} : null,
           ]}>
           <RootActiveSync value={isRootActive} onChange={setRootActive} />
           {children(isFocused && isRootActive)}
-        </View>
+        </Animated.View>
       )}
     </SpatialNavigationFocusableView>
   );
@@ -120,8 +142,5 @@ const styles = StyleSheet.create({
     borderWidth: FOCUS.width,
     borderColor: 'transparent',
     padding: FOCUS.gap,
-  },
-  ringOn: {
-    borderColor: colors.focus,
   },
 });

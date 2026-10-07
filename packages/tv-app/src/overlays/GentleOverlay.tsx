@@ -3,7 +3,9 @@ import {StyleSheet, Text, View} from 'react-native';
 import {DefaultFocus, SpatialNavigationRoot, SpatialNavigationView} from 'react-tv-space-navigation';
 import {announce} from '../a11y/announce';
 import {FocusButton} from '../components/FocusButton';
-import {SAFE, colors, s, type} from '../theme/theme';
+import {IconBadge} from '../components/Icon';
+import {OnSurface} from '../theme/surface';
+import {FOCUS, SAFE, colors, s, type} from '../theme/theme';
 import type {AlertAction, AlertView} from '../types';
 
 export const GENTLE_TITLE = "A visitor isn't on today's list";
@@ -14,7 +16,7 @@ export interface GentleOverlayProps {
   onRespond: (action: AlertAction) => void;
 }
 
-/** Bottom panel for an unexpected visitor when no risk window is open. Informational, not urgent. */
+/** For an unexpected visitor when no risk window is open: a light sheet across the bottom. Informational, not urgent. */
 export function GentleOverlay({alert, busyAction, onRespond}: GentleOverlayProps) {
   useEffect(() => {
     announce(`${GENTLE_TITLE}. ${alert.description}. I know this person is selected. You can also choose Dismiss.`);
@@ -23,31 +25,33 @@ export function GentleOverlay({alert, busyAction, onRespond}: GentleOverlayProps
 
   return (
     <View style={styles.scrim} testID="gentle-overlay">
-      <SpatialNavigationRoot>
-        <View style={styles.panel} accessibilityViewIsModal>
-          <View style={styles.texts}>
-            <Text style={type.title48} accessibilityRole="header">
-              {GENTLE_TITLE}
-            </Text>
-            <Text style={[type.body, styles.desc]}>{`${alert.createdLabel} · ${alert.description}`}</Text>
-            <Text style={[type.small, styles.desc]}>
-              You don't have to answer the door. If you know them, let Kinwise know.
-            </Text>
+      <OnSurface surface="sheet">
+        <SpatialNavigationRoot>
+          <View style={styles.sheet} accessibilityViewIsModal>
+            <IconBadge name="door-open" color={colors.sun} size={s(96)} style={styles.badge} />
+            <View style={styles.texts}>
+              <Text style={[type.heading, styles.deep]} accessibilityRole="header">
+                {GENTLE_TITLE}
+              </Text>
+              <Text style={[type.body, styles.deep, styles.desc]}>{`${alert.description}, ${alert.createdLabel}.`}</Text>
+              <Text style={[type.body, styles.soft]}>You don't have to answer the door. If you know them, let Kinwise know.</Text>
+            </View>
+            <SpatialNavigationView direction="horizontal" style={styles.buttons}>
+              <DefaultFocus>
+                <FocusButton
+                  variant="primary"
+                  icon="check"
+                  label="I know this person"
+                  busy={busyAction === 'known_person'}
+                  onSelect={() => onRespond('known_person')}
+                  style={styles.gap}
+                />
+              </DefaultFocus>
+              <FocusButton label="Dismiss" busy={busyAction === 'dismiss'} onSelect={() => onRespond('dismiss')} />
+            </SpatialNavigationView>
           </View>
-          <SpatialNavigationView direction="horizontal" style={styles.buttons}>
-            <DefaultFocus>
-              <FocusButton
-                variant="primary"
-                label="I know this person"
-                busy={busyAction === 'known_person'}
-                onSelect={() => onRespond('known_person')}
-                style={styles.gap}
-              />
-            </DefaultFocus>
-            <FocusButton label="Dismiss" busy={busyAction === 'dismiss'} onSelect={() => onRespond('dismiss')} />
-          </SpatialNavigationView>
-        </View>
-      </SpatialNavigationRoot>
+        </SpatialNavigationRoot>
+      </OnSurface>
     </View>
   );
 }
@@ -65,29 +69,35 @@ const styles = StyleSheet.create({
     paddingBottom: SAFE.vertical,
     zIndex: 40,
   },
-  panel: {
+  sheet: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface2,
-    borderRadius: s(32),
-    borderWidth: s(2),
-    borderColor: 'rgba(251, 191, 36, 0.55)',
-    borderTopWidth: s(8),
-    borderTopColor: colors.caution,
-    paddingVertical: s(40),
-    paddingHorizontal: s(48),
+    backgroundColor: colors.sheet,
+    borderRadius: s(36),
+    paddingVertical: s(36),
+    paddingHorizontal: s(40),
+  },
+  badge: {
+    marginRight: s(32),
   },
   texts: {
     flex: 1,
     paddingRight: s(40),
   },
+  deep: {
+    color: colors.deep,
+  },
+  soft: {
+    color: colors.onSheetSoft,
+  },
   desc: {
-    marginTop: s(10),
+    marginTop: s(8),
   },
   buttons: {
     alignItems: 'center',
+    marginRight: -(FOCUS.width + FOCUS.gap),
   },
   gap: {
-    marginRight: s(16),
+    marginRight: s(12),
   },
 });

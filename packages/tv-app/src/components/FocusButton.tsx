@@ -1,13 +1,17 @@
 import React, {forwardRef} from 'react';
 import {StyleSheet, Text, View, type AccessibilityRole, type ViewStyle} from 'react-native';
 import type {SpatialNavigationNodeRef} from 'react-tv-space-navigation';
-import {colors, s, type} from '../theme/theme';
+import {useSurface, type Surface} from '../theme/surface';
+import {RADIUS, colors, s, type} from '../theme/theme';
 import {Focusable} from './Focusable';
+import {Icon, type IconName, type IconTone} from './Icon';
 
-export type ButtonVariant = 'primary' | 'pause' | 'secondary' | 'quiet';
+/** primary: the one thing to do here. secondary: an alternative. quiet: least emphasis. */
+export type ButtonVariant = 'primary' | 'secondary' | 'quiet';
 
 export interface FocusButtonProps {
   label: string;
+  icon?: IconName;
   /** Defaults to `label`. */
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -19,11 +23,12 @@ export interface FocusButtonProps {
   style?: ViewStyle;
 }
 
-/** A large TV button. Unfocused: calm fill. Focused: cream fill + amber ring. */
+/** A large TV button: glassy until it is selected, then solid white (or deep on light surfaces). */
 export const FocusButton = forwardRef<SpatialNavigationNodeRef, FocusButtonProps>(function FocusButton(
-  {label, accessibilityLabel, accessibilityHint, accessibilityRole = 'button', variant = 'secondary', busy, onSelect, onFocus, style},
+  {label, icon, accessibilityLabel, accessibilityHint, accessibilityRole = 'button', variant = 'secondary', busy, onSelect, onFocus, style},
   ref,
 ) {
+  const surface = useSurface();
   return (
     <Focusable
       ref={ref}
@@ -34,55 +39,63 @@ export const FocusButton = forwardRef<SpatialNavigationNodeRef, FocusButtonProps
       onSelect={onSelect}
       onFocus={onFocus}
       style={style}
-      radius={s(20)}>
-      {(focused) => (
-        <View style={[styles.face, faceFor(variant, focused), busy ? styles.busy : null]}>
-          <Text style={[type.bodyStrong, styles.label, {color: textFor(variant, focused)}]} numberOfLines={1}>
-            {busy ? 'One moment…' : label}
-          </Text>
-        </View>
-      )}
+      radius={RADIUS.button}>
+      {(focused) => {
+        const face = faceFor(surface, variant, focused);
+        return (
+          <View style={[styles.face, {backgroundColor: face.bg, borderColor: face.border}, busy ? styles.busy : null]}>
+            {icon ? <Icon name={icon} tone={face.icon} size={s(40)} style={styles.icon} /> : null}
+            <Text style={[type.button, {color: face.text}]} numberOfLines={1}>
+              {busy ? 'One moment…' : label}
+            </Text>
+          </View>
+        );
+      }}
     </Focusable>
   );
 });
 
-function faceFor(variant: ButtonVariant, focused: boolean) {
-  switch (variant) {
-    case 'pause':
-      return {backgroundColor: colors.pause, borderColor: colors.pause};
-    case 'primary':
-      return {backgroundColor: colors.cream, borderColor: colors.cream};
-    case 'quiet':
-      return focused
-        ? {backgroundColor: colors.cream, borderColor: colors.cream}
-        : {backgroundColor: 'transparent', borderColor: colors.line};
-    default:
-      return focused
-        ? {backgroundColor: colors.cream, borderColor: colors.cream}
-        : {backgroundColor: colors.surface2, borderColor: colors.line};
-  }
+interface Face {
+  bg: string;
+  border: string;
+  text: string;
+  icon: IconTone;
 }
 
-function textFor(variant: ButtonVariant, focused: boolean): string {
-  if (variant === 'pause') return colors.onPause;
-  if (variant === 'primary' || focused) return colors.onLight;
-  return colors.text;
+const NONE = 'transparent';
+
+function faceFor(surface: Surface, variant: ButtonVariant, focused: boolean): Face {
+  if (surface === 'backdrop') {
+    if (focused) return {bg: colors.white, border: colors.white, text: colors.deep, icon: 'dark'};
+    if (variant === 'primary') return {bg: colors.sun, border: colors.sun, text: colors.deep, icon: 'dark'};
+    if (variant === 'quiet') return {bg: NONE, border: colors.glassLine, text: colors.white, icon: 'light'};
+    return {bg: colors.glassStrong, border: NONE, text: colors.white, icon: 'light'};
+  }
+  // Light and persimmon surfaces: deep is the strong colour, white marks focus.
+  if (focused) {
+    return surface === 'persimmon'
+      ? {bg: colors.white, border: colors.white, text: colors.deep, icon: 'dark'}
+      : {bg: colors.deep, border: colors.deep, text: colors.white, icon: 'light'};
+  }
+  if (variant === 'primary') return {bg: colors.deep, border: colors.deep, text: colors.white, icon: 'light'};
+  return {bg: NONE, border: variant === 'quiet' ? NONE : colors.deep, text: colors.deep, icon: 'dark'};
 }
 
 const styles = StyleSheet.create({
   face: {
-    minHeight: s(88),
-    paddingHorizontal: s(40),
+    flexDirection: 'row',
+    minHeight: s(92),
+    paddingHorizontal: s(38),
     paddingVertical: s(20),
-    borderRadius: s(20),
-    borderWidth: s(2),
+    borderRadius: RADIUS.button,
+    borderWidth: s(3),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  label: {
-    textAlign: 'center',
+  icon: {
+    marginRight: s(16),
   },
   busy: {
-    opacity: 0.75,
+    opacity: 0.7,
   },
 });

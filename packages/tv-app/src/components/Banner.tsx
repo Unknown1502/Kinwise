@@ -1,19 +1,20 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {SAFE, colors, s, type} from '../theme/theme';
+import {IconBadge} from './Icon';
 
-/** Unobtrusive top-centre banner ("Reconnecting…", short confirmations). Never takes focus. */
+/** Unobtrusive top-centre notice ("Reconnecting…", short confirmations). Never takes focus. */
 export function Banner({text, tone = 'muted'}: {text: string; tone?: 'muted' | 'ok' | 'error'}) {
-  const accent = tone === 'ok' ? colors.ok : tone === 'error' ? colors.caution : colors.muted;
+  const badge =
+    tone === 'ok'
+      ? ({name: 'check', color: colors.mint} as const)
+      : tone === 'error'
+        ? ({name: 'shield-alert', color: colors.coral} as const)
+        : ({name: 'clock', color: colors.soft} as const);
   return (
     <View pointerEvents="none" style={styles.wrap}>
-      <View
-        style={[styles.banner, {borderColor: accent}]}
-        accessible
-        accessibilityRole="alert"
-        accessibilityLiveRegion="polite"
-        accessibilityLabel={text}>
-        <View style={[styles.dot, {backgroundColor: accent}]} />
+      <View style={styles.banner} accessible accessibilityRole="alert" accessibilityLiveRegion="polite" accessibilityLabel={text}>
+        <IconBadge name={badge.name} color={badge.color} size={s(56)} />
         <Text style={[type.body, styles.text]}>{text}</Text>
       </View>
     </View>
@@ -33,19 +34,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     maxWidth: s(1300),
-    backgroundColor: colors.surface2,
+    backgroundColor: colors.deep,
+    borderColor: colors.glassLine,
     borderWidth: s(2),
-    borderRadius: s(999),
-    paddingVertical: s(14),
-    paddingHorizontal: s(32),
-  },
-  dot: {
-    width: s(16),
-    height: s(16),
-    borderRadius: s(8),
-    marginRight: s(16),
+    borderRadius: s(44),
+    paddingVertical: s(12),
+    paddingLeft: s(12),
+    paddingRight: s(36),
   },
   text: {
-    color: colors.text,
+    flexShrink: 1,
+    marginLeft: s(18),
   },
 });

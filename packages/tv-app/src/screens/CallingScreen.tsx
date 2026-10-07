@@ -1,11 +1,13 @@
 import React, {useEffect} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {announce} from '../a11y/announce';
+import {Avatar} from '../components/Avatar';
+import {IconBadge} from '../components/Icon';
 import {SAFE, colors, s, type} from '../theme/theme';
 
 export const CALLING_CONFIRMATION_MS = 5000;
 
-/** Shown for 5 s after "Call {caregiver}": a reassuring confirmation, then back to Today at Home. */
+/** Shown for 5 s after "Call {caregiver}": a reassuring confirmation, then back to the home screen. */
 export function CallingScreen({name}: {name: string}) {
   useEffect(() => {
     announce(`Calling ${name} now. Kinwise asked ${name} to call you right away. You don't need to open the door.`);
@@ -13,51 +15,54 @@ export function CallingScreen({name}: {name: string}) {
 
   return (
     <View style={styles.screen} testID="calling-screen" accessibilityLiveRegion="assertive">
-      <View style={styles.ring}>
-        <View style={styles.dot} />
+      <View style={styles.halo}>
+        <Avatar name={name} size={s(200)} />
+        <IconBadge name="phone" color={colors.mint} size={s(84)} style={styles.phone} />
       </View>
       <Text style={[type.display, styles.center]} accessibilityRole="header">{`Calling ${name} now…`}</Text>
       <Text style={[type.lead, styles.center, styles.sub]}>
         {`Kinwise asked ${name} to call you right away. You don't need to open the door.`}
       </Text>
-      <Text style={[type.small, styles.center, styles.hint]}>Back to Today at Home in a moment.</Text>
+      <Text style={[type.small, styles.center, styles.hint]}>Back to the home screen in a moment.</Text>
     </View>
   );
 }
 
+const HALO = s(260);
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.bg,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SAFE.horizontal,
     paddingVertical: SAFE.vertical,
   },
-  ring: {
-    width: s(140),
-    height: s(140),
-    borderRadius: s(70),
-    borderWidth: s(6),
-    borderColor: colors.ok,
+  halo: {
+    width: HALO,
+    height: HALO,
+    borderRadius: HALO / 2,
+    backgroundColor: colors.glassStrong,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: s(40),
+    marginBottom: s(44),
   },
-  dot: {
-    width: s(56),
-    height: s(56),
-    borderRadius: s(28),
-    backgroundColor: colors.ok,
+  phone: {
+    position: 'absolute',
+    right: s(4),
+    bottom: s(4),
+    borderWidth: s(6),
+    borderColor: colors.backdrop,
   },
   center: {
     textAlign: 'center',
   },
   sub: {
-    marginTop: s(24),
-    maxWidth: s(1300),
+    marginTop: s(20),
+    maxWidth: s(1200),
+    color: colors.soft,
   },
   hint: {
-    marginTop: s(36),
+    marginTop: s(40),
   },
 });

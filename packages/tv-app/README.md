@@ -1,7 +1,7 @@
 # Kinwise for Fire TV (Vega OS)
 
-The resident's screen: **Today at Home**, **the Pause**, consent and privacy controls, and the
-access log. React Native for Vega, D-pad first, built for a 10-foot screen.
+The resident's screen: the **home screen** (a day clock with today's visits, reminders and notes
+from family), **the Pause**, consent and privacy controls, and the access log. React Native for Vega, D-pad first, built for a 10-foot screen.
 
 The project layout mirrors Amazon's sample
 [`AmazonAppDev/react-native-multi-tv-app-sample/apps/vega`](https://github.com/AmazonAppDev/react-native-multi-tv-app-sample/tree/main/apps/vega)
@@ -11,6 +11,12 @@ The project layout mirrors Amazon's sample
 > The Vega SDK runs on **Ubuntu 20.04+ or macOS only**. On Windows, develop with the browser
 > preview in [`../tv-preview`](../tv-preview) (react-native-web). It renders this same `src/`.
 > Do not run `npm install` here on Windows.
+>
+> To review every screen without a hub or a staged scenario, run the fixture hub from
+> `packages/tv-preview` (`npx tsx scripts/fixture-hub.ts`), open
+> `http://localhost:5174/?hub=http://localhost:8799&token=dev-tv`, and switch screens with
+> `curl -X POST localhost:8799/__fixture/pause` (also `home`, `privacy`, `watching`, `gentle`,
+> `expected`, `onboarding`, `proposals`, `empty`).
 
 ## How it fits together
 
@@ -20,7 +26,10 @@ The project layout mirrors Amazon's sample
 | `src/api.ts` | Typed client for `/tv/*` (bearer device token, 8 s timeouts via `AbortController`). |
 | `src/hooks/useHubState.ts` + `src/logic/poller.ts` | Polls `GET /tv/state` every 2 s, backs off to 15 s on errors, shows "Reconnecting…" after 10 s. |
 | `src/screens/*`, `src/overlays/*` | Onboarding (3 steps), Home, Pause, Calling, Settings & privacy, gentle panel, expected toast. |
-| `src/components/Focusable.tsx` | The single focusable primitive. It draws a 6 px amber ring, sets label, role and state, and speaks the label on focus when VoiceView is on. |
+| `src/components/Focusable.tsx` | The single focusable primitive. The focused item grows slightly and gets a 5 px ring (white on the backdrop, deep on light cards and on the Pause). It sets label, role and state, and speaks the label on focus when VoiceView is on. |
+| `src/theme/theme.ts`, `src/theme/surface.tsx` | Colours, the type scale and the bundled typeface; `OnSurface` switches focus styling on light and persimmon backgrounds. |
+| `src/components/Icon.tsx`, `Avatar.tsx` | Lucide icons and coloured icon badges; a family member's initial on a warm disc. |
+| `src/logic/today.ts` | The home screen's day logic: "Monday afternoon", one time-ordered agenda, and privacy time left (measured on the hub's clock). |
 | `*.vega.ts(x)` | Vega-only overrides. Metro resolves `vega.tsx`/`vega.ts` first. The plain files are what the web preview uses. |
 
 Vega-only files:
@@ -138,14 +147,42 @@ Pause aloud, and selecting **Call Priya** notifies the caregiver.
 - **D-pad first.** `react-tv-space-navigation` 5.2.0 handles focus. There is one active
   `SpatialNavigationRoot` per screen. An overlay deactivates the root beneath it, so only one ring
   ever shows.
-- **Text and margins.** Body text is at least 28 px and titles are 48–64 px, on a 1920×1080
+- **Text and margins.** Nothing is smaller than 28 px and body copy is 32 px, on a 1920×1080
   canvas. Every screen keeps 5% overscan margins (96 × 54 px).
-- **Focus ring.** It is 6 px amber `#fde68a` with a 4 px gap, so it stays visible on cream and
-  orange fills.
+- **Focus.** The focused item grows by up to 5% (instantly when Reduce Motion is on) and gets a
+  5 px ring with a 4 px gap: white on the backdrop, deep on the apricot card, the light visitor
+  sheet and the persimmon Pause.
 - **Labels.** Every focusable element sets `accessibilityLabel` and `accessibilityRole`, plus
   `accessibilityState` and `aria-*` (selected, checked, busy).
 - **VoiceView.** `AccessibilityInfo.announceForAccessibility` announces:
   - the Pause, the gentle panel, the expected toast and the calling confirmation;
   - each focus change while a screen reader is on, because spatial focus is not native focus.
-- **Calm Pause.** The Pause is orange, not red. A stray Back press never closes it. Dismiss is
-  always one press away.
+- **Calm Pause.** The Pause turns the whole screen persimmon, not red. A stray Back press never
+  closes it. Dismiss is always one press away.
+
+## Design
+
+A warm family display, in the spirit of an Echo Show home screen. The time and a greeting
+("Good afternoon, Asha") come first. The newest note from family is the largest thing on screen,
+on an apricot card with the sender's initial. Today's visits and reminders share one list in time
+order, each marked with its own colour and icon; items whose time has passed fade. Focus works like
+Fire TV's own: the selected item turns white and grows slightly.
+
+| Token | Hex | Used for |
+|---|---|---|
+| Backdrop | `#0F3142` + `assets/home-bg.png` | Blue-teal evening gradient with a warm lamp glow |
+| Apricot | `#FFD5BA` | Notes from family |
+| Mint | `#7FDDB8` | Visitors, "Kinwise is on", switches that are on |
+| Sun | `#FFD166` | Reminders, "New", primary buttons |
+| Coral | `#FF8A65` | Scam warnings and the safety watch |
+| Lilac | `#C9B8FF` | Privacy time |
+| Persimmon | `#EE6A3C` | The Pause (the whole screen) |
+| Deep | `#0B2230` | Text on light surfaces and on the Pause |
+
+The typeface is **Atkinson Hyperlegible Next** by the Braille Institute, drawn for readers with
+low vision. The four weights live in `assets/fonts/` under the SIL Open Font License
+(`assets/fonts/OFL.txt`). Each weight is its own family name, so Vega and the browser preview
+resolve the same file.
+
+Icons are [Lucide](https://lucide.dev) (ISC licence, `assets/icons/LICENSE-lucide.txt`),
+pre-rendered as light and dark PNGs so Vega needs no image tinting.

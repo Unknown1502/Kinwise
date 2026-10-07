@@ -5,8 +5,10 @@ import {announce} from '../a11y/announce';
 import {FamilyVideo} from '../components/FamilyVideo';
 import {Focusable} from '../components/Focusable';
 import {FocusButton} from '../components/FocusButton';
+import {IconBadge} from '../components/Icon';
 import {PAUSE_TITLE, pauseAnnouncement, pauseLine} from '../logic/copy';
-import {SAFE, colors, s, type} from '../theme/theme';
+import {OnSurface} from '../theme/surface';
+import {FOCUS, RADIUS, SAFE, colors, s, type} from '../theme/theme';
 import type {AlertAction, AlertView} from '../types';
 
 export interface PauseScreenProps {
@@ -20,8 +22,9 @@ export interface PauseScreenProps {
 }
 
 /**
- * The Pause: a full-screen, calm takeover when an unexpected visitor arrives during a risk
- * window. It advises; it never controls. Default focus is "Call {caregiver}".
+ * The Pause: the whole screen turns persimmon when an unexpected visitor arrives during a risk
+ * window, so the room itself changes colour, noticeable even from the hallway. It advises; it
+ * never controls. Default focus is "Call {caregiver}".
  */
 export function PauseScreen({alert, videoUrl, busyAction, error, onRespond}: PauseScreenProps) {
   const [signIndex, setSignIndex] = useState(0);
@@ -40,224 +43,221 @@ export function PauseScreen({alert, videoUrl, busyAction, error, onRespond}: Pau
   }, [error]);
 
   return (
-    <SpatialNavigationRoot>
-      <View style={styles.screen} testID="pause-screen">
-        <View style={styles.accent} />
-        <View style={styles.columns}>
-          <View style={styles.left}>
-            <Text style={[type.smallStrong, styles.eyebrow]}>{`Kinwise · ${alert.createdLabel}`}</Text>
-            <Text style={type.display} accessibilityRole="header">
-              {PAUSE_TITLE}
-            </Text>
-            <Text style={[type.lead, styles.line]}>{pauseLine(alert)}</Text>
-            {alert.description ? (
-              <Text style={[type.body, styles.door]}>{`At the door: ${alert.description}`}</Text>
-            ) : null}
+    <OnSurface surface="persimmon">
+      <SpatialNavigationRoot>
+        <View style={styles.screen} testID="pause-screen">
+          <View style={styles.columns}>
+            <View style={styles.left}>
+              <View style={styles.whenRow}>
+                <IconBadge name="door-open" color={colors.white} size={s(64)} />
+                <Text style={[type.bodyStrong, styles.when]}>{`${alert.createdLabel}, someone is at your door`}</Text>
+              </View>
+              <Text style={type.pause} accessibilityRole="header">
+                {PAUSE_TITLE}
+              </Text>
+              <Text style={[type.lead, styles.ink, styles.line]}>{pauseLine(alert)}</Text>
+              {alert.description ? (
+                <Text style={[type.body, styles.ink, styles.door]}>{alert.description}</Text>
+              ) : null}
 
-            <View style={styles.signsBlock}>
-              <Text style={[type.small, styles.signsLabel]}>Warning signs Kinwise noticed</Text>
-              <SpatialNavigationView direction="horizontal" style={styles.chips}>
-                {alert.signs.map((sg, index) => (
-                  <Focusable
-                    key={index}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Warning sign: ${sg.label}`}
-                    accessibilityHint={sg.explanation}
-                    onFocus={() => setSignIndex(index)}
-                    onSelect={() => {
-                      setSignIndex(index);
-                      announce(sg.explanation);
-                    }}
-                    style={styles.chipOuter}
-                    radius={s(999)}>
-                    {(focused) => (
-                      <View
-                        style={[
-                          styles.chip,
-                          index === signIndex ? styles.chipCurrent : null,
-                          focused ? styles.chipFocused : null,
-                        ]}>
-                        <Text style={[type.smallStrong, styles.chipText, focused ? styles.onLight : null]}>{sg.label}</Text>
-                      </View>
-                    )}
-                  </Focusable>
-                ))}
-              </SpatialNavigationView>
-              {sign ? (
-                <View style={styles.explanation} accessibilityLiveRegion="polite">
-                  <Text style={type.body}>{sign.explanation}</Text>
+              {alert.signs.length ? (
+                <View style={styles.signs}>
+                  <Text style={[type.smallStrong, styles.ink, styles.signsLabel]}>What Kinwise noticed</Text>
+                  <SpatialNavigationView direction="horizontal" style={styles.chips}>
+                    {alert.signs.map((sg, index) => (
+                      <Focusable
+                        key={index}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Warning sign: ${sg.label}`}
+                        accessibilityHint={sg.explanation}
+                        onFocus={() => setSignIndex(index)}
+                        onSelect={() => {
+                          setSignIndex(index);
+                          announce(sg.explanation);
+                        }}
+                        style={styles.chipOuter}
+                        radius={CHIP_RADIUS}>
+                        {(focused) => (
+                          <View style={[styles.chip, index === signIndex ? styles.chipCurrent : null, focused ? styles.chipFocused : null]}>
+                            <Text
+                              style={[
+                                type.smallStrong,
+                                styles.ink,
+                                index === signIndex && !focused ? styles.onInk : null,
+                              ]}>
+                              {sg.label}
+                            </Text>
+                          </View>
+                        )}
+                      </Focusable>
+                    ))}
+                  </SpatialNavigationView>
+                  {sign ? (
+                    <Text style={[type.body, styles.ink, styles.explanation]} accessibilityLiveRegion="polite">
+                      {sign.explanation}
+                    </Text>
+                  ) : null}
                 </View>
               ) : null}
-            </View>
 
-            <SpatialNavigationView direction="horizontal" style={styles.buttons}>
-              <DefaultFocus>
+              <SpatialNavigationView direction="horizontal" style={styles.buttons}>
+                <DefaultFocus>
+                  <FocusButton
+                    variant="primary"
+                    icon="phone"
+                    label={`Call ${name}`}
+                    accessibilityHint={`Asks ${name} to call you right away`}
+                    busy={busyAction === 'call_family'}
+                    onSelect={() => onRespond('call_family')}
+                    style={styles.buttonGap}
+                  />
+                </DefaultFocus>
                 <FocusButton
-                  variant="pause"
-                  label={`Call ${name}`}
-                  accessibilityHint={`Asks ${name} to call you right away`}
-                  busy={busyAction === 'call_family'}
-                  onSelect={() => onRespond('call_family')}
+                  icon="check"
+                  label="I know this person"
+                  accessibilityHint="Closes the Pause. You can add them as an expected visitor later"
+                  busy={busyAction === 'known_person'}
+                  onSelect={() => onRespond('known_person')}
                   style={styles.buttonGap}
                 />
-              </DefaultFocus>
-              <FocusButton
-                label="I know this person"
-                accessibilityHint="Closes the Pause. You can add them as an expected visitor later"
-                busy={busyAction === 'known_person'}
-                onSelect={() => onRespond('known_person')}
-                style={styles.buttonGap}
-              />
-              <FocusButton
-                variant="quiet"
-                label="Dismiss"
-                accessibilityHint="Closes the Pause"
-                busy={busyAction === 'dismiss'}
-                onSelect={() => onRespond('dismiss')}
-              />
-            </SpatialNavigationView>
-            {error ? <Text style={[type.bodyStrong, styles.error]}>{error}</Text> : null}
-          </View>
+                <FocusButton
+                  variant="quiet"
+                  icon="x"
+                  label="Dismiss"
+                  accessibilityHint="Closes the Pause"
+                  busy={busyAction === 'dismiss'}
+                  onSelect={() => onRespond('dismiss')}
+                />
+              </SpatialNavigationView>
+              {error ? <Text style={[type.bodyStrong, styles.ink, styles.error]}>{error}</Text> : null}
+            </View>
 
-          <View style={styles.right}>
-            {message ? (
-              <View style={styles.messageCard}>
-                <Text style={[type.section, styles.messageTitle]} accessibilityRole="header">
-                  {`A message from ${message.from}`}
-                </Text>
-                <FamilyVideo url={videoUrl} from={message.from} />
-                <View
-                  style={styles.captions}
-                  accessible
-                  accessibilityRole="text"
-                  accessibilityLabel={`${message.from} says: ${message.text}`}>
-                  <Text style={type.caption}>{`“${message.text}”`}</Text>
+            <View style={styles.right}>
+              {message ? (
+                <>
+                  <Text style={[type.smallStrong, styles.ink, styles.messageLabel]} accessibilityRole="header">
+                    {`A message from ${message.from}`}
+                  </Text>
+                  <FamilyVideo url={videoUrl} from={message.from} />
+                  <View accessible accessibilityRole="text" accessibilityLabel={`${message.from} says: ${message.text}`}>
+                    <Text style={[type.caption, styles.quote]}>{`“${message.text}”`}</Text>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.noMessage}>
+                  <Text style={[type.heading, styles.ink]}>{`${name} is one button away`}</Text>
+                  <Text style={[type.body, styles.ink, styles.noMessageText]}>
+                    {`Choose “Call ${name}” and Kinwise will ask ${name} to call you now.`}
+                  </Text>
                 </View>
-              </View>
-            ) : (
-              <View style={styles.messageCard}>
-                <Text style={[type.section, styles.messageTitle]}>{`${name} is a button away`}</Text>
-                <Text style={type.body}>{`Choose “Call ${name}” and Kinwise will ask ${name} to call you now.`}</Text>
-              </View>
-            )}
+              )}
+            </View>
           </View>
         </View>
-      </View>
-    </SpatialNavigationRoot>
+      </SpatialNavigationRoot>
+    </OnSurface>
   );
 }
+
+const CHIP_RADIUS = RADIUS.chip;
+const RING = FOCUS.width + FOCUS.gap;
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.persimmon,
     paddingHorizontal: SAFE.horizontal,
     paddingVertical: SAFE.vertical,
-  },
-  accent: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: s(10),
-    backgroundColor: colors.pause,
   },
   columns: {
     flex: 1,
     flexDirection: 'row',
   },
   left: {
-    flex: 1.65,
-    paddingRight: s(56),
+    flex: 1.55,
+    paddingRight: s(72),
     justifyContent: 'center',
   },
   right: {
     flex: 1,
     justifyContent: 'center',
   },
-  eyebrow: {
-    color: colors.pause,
-    marginBottom: s(12),
-    letterSpacing: s(1),
+  ink: {
+    color: colors.deep,
+  },
+  onInk: {
+    color: colors.white,
+  },
+  whenRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: s(22),
+  },
+  when: {
+    color: colors.deep,
+    marginLeft: s(18),
   },
   line: {
-    marginTop: s(20),
+    marginTop: s(28),
   },
   door: {
-    marginTop: s(14),
-    color: colors.muted,
+    marginTop: s(10),
   },
-  signsBlock: {
-    marginTop: s(32),
+  signs: {
+    marginTop: s(34),
   },
   signsLabel: {
-    marginBottom: s(8),
+    marginBottom: s(6),
   },
   chips: {
     flexWrap: 'wrap',
+    marginLeft: -RING,
   },
   chipOuter: {
-    marginRight: s(6),
-    marginBottom: s(4),
+    marginRight: s(2),
   },
   chip: {
-    paddingVertical: s(10),
-    paddingHorizontal: s(24),
-    borderRadius: s(999),
-    borderWidth: s(2),
-    borderColor: 'rgba(251, 146, 60, 0.55)',
-    backgroundColor: colors.pauseTint,
+    paddingVertical: s(8),
+    paddingHorizontal: s(22),
+    borderRadius: CHIP_RADIUS,
+    borderWidth: s(3),
+    borderColor: colors.deep,
   },
   chipCurrent: {
-    borderColor: colors.pause,
+    backgroundColor: colors.deep,
   },
   chipFocused: {
-    backgroundColor: colors.cream,
-    borderColor: colors.cream,
-  },
-  chipText: {
-    color: colors.cream,
-  },
-  onLight: {
-    color: colors.onLight,
+    backgroundColor: colors.white,
+    borderColor: colors.white,
   },
   explanation: {
-    marginTop: s(12),
-    backgroundColor: colors.surface,
-    borderRadius: s(20),
-    borderLeftWidth: s(8),
-    borderLeftColor: colors.pause,
-    paddingVertical: s(18),
-    paddingHorizontal: s(28),
-    minHeight: s(124),
-    justifyContent: 'center',
+    marginTop: s(10),
+    minHeight: s(92),
+    maxWidth: s(1000),
   },
   buttons: {
-    marginTop: s(36),
+    marginTop: s(30),
+    marginLeft: -RING,
     alignItems: 'center',
   },
   buttonGap: {
-    marginRight: s(16),
+    marginRight: s(8),
   },
   error: {
-    marginTop: s(20),
-    color: colors.caution,
+    marginTop: s(16),
   },
-  messageCard: {
-    backgroundColor: colors.surface,
-    borderRadius: s(28),
-    borderWidth: s(2),
-    borderColor: colors.line,
-    padding: s(32),
+  messageLabel: {
+    marginBottom: s(14),
   },
-  messageTitle: {
-    marginBottom: s(20),
+  quote: {
+    marginTop: s(22),
   },
-  captions: {
-    marginTop: s(24),
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
-    borderRadius: s(16),
-    paddingVertical: s(16),
-    paddingHorizontal: s(22),
+  noMessage: {
+    backgroundColor: 'rgba(11, 34, 48, 0.1)',
+    borderRadius: RADIUS.panel,
+    padding: s(40),
+  },
+  noMessageText: {
+    marginTop: s(12),
   },
 });
