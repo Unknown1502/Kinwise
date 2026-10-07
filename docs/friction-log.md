@@ -81,3 +81,16 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
 - **Workaround:** a one-time account setup: a CloudWatch Logs resource policy for `xray.amazonaws.com` on `aws/spans`, then `aws xray update-trace-segment-destination --destination CloudWatchLogs`, then wait for `ACTIVE`. Tracing is now also a deploy flag (`-c tracing=false`).
 - **Minutes lost:** ~15, plus a rollback cycle.
 - **Suggestion:** have the CDK construct (or `agentcore` CLI) check the destination at synth/deploy time and say how to enable it, or enable Transaction Search as part of the construct.
+
+### 12. Vega Virtual Device works under WSL2, but the path there is undocumented (🟠, first-hand, 2026-10-07)
+- **Task:** build and run the Fire TV app for Vega from a Windows laptop.
+- **What worked (not in the docs):** Ubuntu 24.04 in WSL2 exposes `/dev/kvm` (Intel VT-x). `NONINTERACTIVE=true bash get_vvm.sh` installs SDK 0.24.12112, `npm run build:debug` produces x86_64/armv7/aarch64 `.vpkg`s, and the Virtual Device boots in ~30 s with a WSLg window. Kinwise ran end to end against our AWS hub.
+- **Friction, in order:**
+  1. The installer exits with *"jq is required"*, but `jq` isn't listed in the prerequisites we followed.
+  2. The SDK download stalled at 225 MB with no progress output or retry. A manual `vega sdk install <ver>` finished in seconds.
+  3. KeplerPerfCLI post-install failed with `ImportError: libjpeg.so.62` on Ubuntu 24.04 (`apt install libjpeg62` fixes it).
+  4. `npm install` hit `ERESOLVE` on `@amazon-devices/react-native-kepler` peers. `legacy-peer-deps=true` is required, as the multi-TV sample implies but doesn't document.
+  5. The Virtual Device process dies when the WSL session that started it exits, so `vega run-app` then reports *"No devices found"*.
+  6. Generated vpkg names follow the package.json name (`tv-app_x86_64.vpkg`), not `appName`, unlike several docs examples.
+- **Minutes lost:** ~90, mostly the stalled download plus diagnosing WSL networking.
+- **Suggestion:** document WSL2 as a supported (or "known to work") path, add `jq`/`libjpeg62` to the prerequisites, add retry and progress to SDK downloads, and offer a `--detach` option for `vega virtual-device start`.

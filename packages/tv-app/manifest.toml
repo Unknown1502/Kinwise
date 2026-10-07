@@ -13,6 +13,7 @@ schema-version = 1
 title = "Kinwise"
 version = "0.1.0"
 id = "com.kinwise.tv"
+icon = "@image/kinwise_icon.png"   # assets/image/kinwise_icon.png (512x512 PNG)
 
 [os.version]
 min = "1.2"

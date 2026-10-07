@@ -44,48 +44,55 @@ export const HUB_URL = 'http://192.168.1.50:8787'; // LAN IP of the machine runn
 - Or use the deployed API Gateway URL plus a device token from the hub's `DEVICE_TOKENS`.
 - `DEVICE_TOKEN = 'dev-tv'` works with the hub's `AUTH_MODE=dev`.
 
-## 2. Install the Vega SDK (Ubuntu)
+## 2. Install the Vega SDK (Ubuntu, or Ubuntu in WSL2)
 
-Follow Amazon's *Install the Vega SDK* guide (developer.amazon.com/docs/vega). In short:
+> **Verified 2026-10-07 on Windows 11 + WSL2 (Ubuntu 24.04), Vega SDK 0.24.12112.** Amazon only lists native
+> Ubuntu/macOS, but the Vega Virtual Device ran under WSL2 because `/dev/kvm` is available (Intel VT-x, nested
+> virtualization). Keep the distro on a large drive: `wsl --install Ubuntu-24.04 --name kinwise-ubuntu --location D:\WSL\kinwise-ubuntu`.
 
 ```bash
-sudo apt remove curl && sudo apt install curl          # native curl, as Amazon's guide asks
-(dpkg -l | grep -q lz4 || sudo apt install -y lz4) && \
-  sudo add-apt-repository -y ppa:deadsnakes/ppa && sudo apt update && \
-  (dpkg -l | grep -q libpython3.8-dev || sudo apt install -y libpython3.8-dev)
-# KVM must be enabled for the Vega Virtual Device; install Node.js 18+ and watchman.
-# Run the Vega SDK installer from the developer portal, then add its exports, e.g.:
-export KEPLER_SDK_PATH=$HOME/kepler/sdk/<version>
-export PATH=$KEPLER_SDK_PATH/bin:$PATH
-kepler --version            # newer SDKs also ship the same CLI as `vega`
+sudo apt-get install -y curl lz4 jq build-essential git watchman libjpeg62   # jq is required by the installer
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs
+ls -l /dev/kvm && sudo usermod -aG kvm $USER                                 # KVM for the Virtual Device
+curl -fsSL https://sdk-installer.vega.labcollab.net/get_vvm.sh -o get_vvm.sh
+NONINTERACTIVE=true bash get_vvm.sh            # installs the vega CLI + latest SDK (+ Virtual Device)
+vega sdk install 0.24.12112                     # re-run if a download stalls; it resumes cleanly
+cat >> ~/.profile <<'EOF'
+export KEPLER_SDK_PATH="$HOME/vega/sdk/vega-sdk/main/0.24.12112"
+export PATH="$HOME/vega/bin:$KEPLER_SDK_PATH/bin:$PATH"
+EOF
 ```
+
+WSL tips from our build:
+- In `/etc/wsl.conf` set `[interop] appendWindowsPath=false`, or Linux may pick up Windows' `npm`/`node`.
+- If WSL logs *"Failed to configure network (networkingMode Nat), falling back to VirtioProxy"*, long-running downloads can stall after a while. `wsl --shutdown` restores full speed, and npm is more robust with `npm config set fetch-timeout 20000` and `maxsockets 3`.
+- From Git Bash, run `MSYS_NO_PATHCONV=1 wsl …` (or use PowerShell); otherwise Git Bash rewrites `/home/...` paths.
 
 ## 3. Build
 
 ```bash
 cd packages/tv-app
-npm install                 # pulls @amazon-devices/*, react-native 0.72 and the Vega CLI platform
-npm test                    # jest: selectScreen + pure logic (test/*.spec.ts)
-npm run build:debug         # react-native build-kepler --build-type Debug
-# npm run build:release     # react-native build-kepler --build-type Release
+npm install                 # .npmrc sets legacy-peer-deps (RN 0.72 + @amazon-devices peers)
+npm run build:debug         # react-native build-kepler --build-type Debug   (~2 min)
+# npm run build:release
 ```
 
-Packages are written to `build/<arch>-<buildType>/KinwiseTV_<arch>.vpkg`. For example:
+The build prints the package paths, for example:
 
-- `build/x86_64-debug/KinwiseTV_x86_64.vpkg` (Vega Virtual Device on an x86_64 machine)
-- `build/armv7-release/KinwiseTV_armv7.vpkg` (Fire TV Stick)
-
-Use the exact file name the build prints.
+- `build/x86_64-debug/tv-app_x86_64.vpkg` (Vega Virtual Device)
+- `build/armv7-debug/tv-app_armv7.vpkg` and `build/aarch64-debug/tv-app_aarch64.vpkg` (Fire TV sticks)
 
 ## 4. Run on the Vega Virtual Device
 
 ```bash
-vega virtual-device start                     # waits for boot; add --timeout 120 if slow
-vega run-app build/x86_64-debug/KinwiseTV_x86_64.vpkg com.kinwise.tv.main -d VirtualDevice
-# (older SDKs: kepler virtual-device start / kepler run-kepler <vpkg> com.kinwise.tv.main -d VirtualDevice)
-npm start                                     # optional: Metro for Fast Refresh during development
+vega virtual-device start --timeout 240        # boots in ~30 s with KVM; a window opens (WSLg on Windows)
+vega device list                               # → VirtualDevice : tv - x86_64
+vega run-app build/x86_64-debug/tv-app_x86_64.vpkg com.kinwise.tv.main -d VirtualDevice
 vega virtual-device stop
 ```
+
+> Under WSL the Virtual Device stops when the WSL session that started it ends. Keep that session open, for
+> example with a script that starts it and then loops on `vega virtual-device status`.
 
 On the Virtual Device, the keyboard stands in for the remote:
 
