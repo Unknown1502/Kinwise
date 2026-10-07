@@ -113,6 +113,23 @@ Any MCP Apps host can use the server. For example, add `http://localhost:8787/mc
 
 **Fire TV (Vega OS):** build `packages/tv-app` with the Vega SDK on Ubuntu or macOS and run it in the Vega Virtual Device. See [`packages/tv-app/README.md`](packages/tv-app/README.md).
 
+## Hosted demo (AWS, us-east-1)
+
+| | |
+|---|---|
+| Hub health | `https://ujvlrh7vwd.execute-api.us-east-1.amazonaws.com/health` |
+| **Alexa+ MCP endpoint** | `https://ujvlrh7vwd.execute-api.us-east-1.amazonaws.com/mcp` (2025-11-25, Streamable HTTP) |
+| OAuth metadata | `https://ujvlrh7vwd.execute-api.us-east-1.amazonaws.com/.well-known/oauth-protected-resource` |
+| Concierge | Bedrock AgentCore Runtime (Strands + Nova 2 Lite) with AgentCore Memory |
+
+Persona tokens for testers are in the Devpost testing instructions. They're never in the repo.
+
+The hosted endpoint passes the open-source checker **16/16**, including a real Cognito `client_credentials` service token that may discover but gets 403 on `tools/call`:
+
+```bash
+npx alexa-mcp-conformance --url https://ujvlrh7vwd.execute-api.us-east-1.amazonaws.com/mcp --token <resident token> --service-token <client_credentials token>
+```
+
 ## Deploy to AWS
 
 ```bash
