@@ -83,7 +83,7 @@ export function buildMcpServer(identity: Identity, service: KinwiseService): Mcp
       title: 'Kinwise',
       version: SERVER_VERSION,
       icons: [ICON],
-      websiteUrl: 'https://github.com/kinwise-app/kinwise',
+      websiteUrl: 'https://github.com/Unknown1502/Kinwise',
     },
     { capabilities: { tools: {}, resources: {} }, instructions: INSTRUCTIONS },
   );

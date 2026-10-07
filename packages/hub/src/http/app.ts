@@ -101,7 +101,7 @@ export function createApp(deps: AppDeps): Hono<Env> {
         resource: `${baseUrl(c)}/mcp`,
         authorizationServers: config.cognito ? [config.cognito.issuer] : [`${baseUrl(c)}/dev-auth`],
         resourceName: 'Kinwise',
-        documentation: 'https://github.com/kinwise-app/kinwise#alexa-mcp-add-on',
+        documentation: 'https://github.com/Unknown1502/Kinwise#alexa-mcp-add-on',
       }),
     );
   app.get('/.well-known/oauth-protected-resource', prm);

@@ -101,7 +101,7 @@ It exits non-zero on failures, so it can gate CI. Programmatic use: `runConforma
 
 ## Used in production code by
 
-[Kinwise](../../README.md): a consent-first family safety add-on, and the reason this kit exists. Its hub serves Alexa+ MCP through `withAlexaPlusAuth`.
+[Kinwise](https://github.com/Unknown1502/Kinwise): a consent-first family safety add-on, and the reason this kit exists. Its hub serves Alexa+ MCP through `withAlexaPlusAuth`.
 
 ## Sources
 
