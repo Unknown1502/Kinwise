@@ -1,6 +1,6 @@
 import type { CallToolResult } from '@modelcontextprotocol/client';
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
-import type { SpeechInput } from '../hooks';
+import type { SpeechInput, WakeState } from '../hooks';
 import { useNow } from '../hooks';
 import type { BridgeEvent } from '../lib/cardHost';
 import { prominentCardIds, type CardSpec } from '../lib/cards';
@@ -26,6 +26,8 @@ interface Props {
   active: boolean;
   phase: Phase;
   speech: SpeechInput;
+  /** Hands-free listening state on this device. */
+  wake?: WakeState;
   doorbell?: DoorbellBanner | null;
   onSubmit: (text: string, source: TurnSource) => void;
   onHome: () => void;
@@ -36,13 +38,13 @@ interface Props {
 }
 
 export function EchoScreen(props: Props) {
-  const { persona, state, session, active, phase, speech, doorbell } = props;
+  const { persona, state, session, active, phase, speech, doorbell, wake = 'off' } = props;
   const latest = state.turns[0];
   const hasCards = state.cards.length > 0;
   const showHome = state.view === 'home';
 
   return (
-    <div className={`screen phase-${phase}`} hidden={!active} data-persona={persona.id}>
+    <div className={`screen phase-${phase} wake-${wake}`} hidden={!active} data-persona={persona.id}>
       <StatusBar persona={persona} session={session} showClock={!showHome} onHome={props.onHome} />
 
       {doorbell && (
@@ -60,6 +62,11 @@ export function EchoScreen(props: Props) {
         <CardColumn {...props} hidden={showHome || !hasCards} />
       </div>
 
+      {wake === 'waiting' && phase === 'idle' && (
+        <p className="wake-hint" role="status">
+          Listening for “Alexa”
+        </p>
+      )}
       <InputBar persona={persona} phase={phase} speech={speech} active={active} onSubmit={props.onSubmit} />
       <div className="light-bar" aria-hidden="true" />
     </div>

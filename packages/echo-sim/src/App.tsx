@@ -3,15 +3,15 @@ import { useCallback, useEffect, useReducer, useRef, useState, type CSSPropertie
 import { DemoControls, PhonePanel } from './components/Sidebar';
 import { EchoScreen, SIM_LABEL, type DoorbellBanner, type Phase } from './components/EchoScreen';
 import { UnderTheHood } from './components/UnderTheHood';
-import { useFitScale, useSpeechRecognition } from './hooks';
+import { useFitScale, useSpeechRecognition, useWakeWord } from './hooks';
 import type { BridgeEvent } from './lib/cardHost';
 import { cardsFromToolCalls, toolErrorNotes, type CardSource, type CardSpec } from './lib/cards';
 import { resultText, spokenFailure, toolCallSchema, type ToolCall } from './lib/concierge';
 import { prettyJson, toolLabel } from './lib/format';
-import { askConcierge, describeDecision, resetDemo, ringDoorbell } from './lib/hubApi';
+import { askConcierge, describeDecision, requestSpeech, resetDemo, ringDoorbell } from './lib/hubApi';
 import { McpSession, describeMcpError } from './lib/mcpSession';
 import { PERSONA_IDS, loadConfig, type PersonaId } from './lib/personas';
-import { primeVoices, speak, stopSpeaking } from './lib/speech';
+import { primeVoices, setNaturalVoice, speak, stopSpeaking, type VoiceKind } from './lib/speech';
 import { WireLogStore, nextWireId, type WireEntry } from './lib/wireLog';
 import { initialState, reducer, turnId, type Turn, type TurnSource } from './state';
 
@@ -79,6 +79,7 @@ export function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [phases, setPhases] = useState<Record<PersonaId, Phase>>({ asha: 'idle', priya: 'idle' });
   const [doorbell, setDoorbell] = useState<DoorbellBanner | null>(null);
+  const [voiceUsed, setVoiceUsed] = useState<{ kind: VoiceKind; name: string } | null>(null);
   const fit = useFitScale(SCREEN_W + BEZEL * 2, SCREEN_H + BEZEL * 2, 1.4);
 
   const stateRef = useRef(state);
@@ -96,6 +97,15 @@ export function App() {
   }, []);
 
   // Connect both MCP clients up front so cards render instantly and the status pill is live.
+  // Alexa's replies use the hub's natural voice (Amazon Polly) and fall back to the browser voice.
+  useEffect(() => {
+    setNaturalVoice(
+      (text) => requestSpeech(config.hubUrl, config.personas[activeRef.current].token, text),
+      (kind, name) => setVoiceUsed((v) => (v?.kind === kind && v.name === name ? v : { kind, name })),
+    );
+    return () => setNaturalVoice(undefined);
+  }, []);
+
   useEffect(() => {
     primeVoices();
     for (const s of Object.values(sessions)) void s.connect().catch(() => undefined);
@@ -156,11 +166,18 @@ export function App() {
   );
 
   const speech = useSpeechRecognition((text) => void ask(activeRef.current, text, 'voice'));
+  // Hands-free: paused while Alexa thinks or speaks, and while the push-to-talk mic is in use.
+  const busy = phases[active] === 'thinking' || phases[active] === 'speaking' || speech.listening;
+  const wake = useWakeWord((text) => void ask(activeRef.current, text, 'voice'), busy);
+  const awake = wake.state === 'awake';
 
   useEffect(() => {
-    if (speech.listening) setPhase(active, 'listening');
+    if (speech.listening || awake) setPhase(active, 'listening');
     else setPhases((p) => (p[active] === 'listening' ? { ...p, [active]: 'idle' } : p));
-  }, [speech.listening, active, setPhase]);
+  }, [speech.listening, awake, active, setPhase]);
+
+  /** What the screen shows as "Listening…": the push-to-talk mic, or hands-free after "Alexa". */
+  const voiceInput = speech.listening ? speech : { ...speech, listening: awake, interim: wake.heard, error: speech.error || wake.error };
 
   /** Record a turn that did not come from the concierge (card action, direct call, doorbell). */
   const addLocalTurn = useCallback(
@@ -292,6 +309,10 @@ export function App() {
           ))}
         </fieldset>
         <div className="top-actions">
+          <label className="switch" title={wake.supported ? 'Say "Alexa" to talk, no clicks needed' : 'Hands-free listening needs Chrome or Edge'}>
+            <input type="checkbox" checked={wake.on} disabled={!wake.supported} onChange={(e) => wake.setOn(e.target.checked)} />
+            <span>Hands-free “Alexa”</span>
+          </label>
           <label className="switch">
             <input
               type="checkbox"
@@ -303,6 +324,11 @@ export function App() {
             />
             <span>Speak replies</span>
           </label>
+          {voiceUsed && (
+            <span className={`voice-chip ${voiceUsed.kind}`} title={voiceUsed.kind === 'natural' ? 'Amazon Polly neural voice, from the Kinwise hub' : 'This browser\'s built-in voice (the hub has no natural voice)'}>
+              {voiceUsed.kind === 'natural' ? `Voice: ${voiceUsed.name} (Amazon Polly)` : 'Voice: browser'}
+            </span>
+          )}
           <button type="button" className="toggle-btn" aria-expanded={drawerOpen} onClick={() => setDrawerOpen((o) => !o)}>
             {drawerOpen ? 'Hide' : 'Show'} under the hood
           </button>
@@ -321,7 +347,8 @@ export function App() {
                 session={sessions[id]}
                 active={active === id}
                 phase={phases[id]}
-                speech={speech}
+                speech={voiceInput}
+                wake={active === id ? wake.state : 'off'}
                 doorbell={id === 'asha' ? doorbell : null}
                 onSubmit={(text, source) => void ask(id, text, source)}
                 onHome={() => dispatch({ type: 'view', persona: id, view: 'home' })}

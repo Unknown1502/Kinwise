@@ -10,6 +10,7 @@ One stack, `Kinwise`, in `us-east-1`:
 | Secrets Manager | The Ring → hub HMAC ingest secret, and the seed for hosted-demo tokens |
 | SNS | Caregiver alerts (optional e-mail subscription) |
 | Bedrock AgentCore Runtime + Memory | The concierge (Strands agent, Nova 2 Lite), deployed as a Python code asset |
+| Amazon Polly (neural, voice `Joanna`) | The natural voice for the TV and the Echo simulator. The hub may only call `polly:SynthesizeSpeech`; settings `SPEECH`, `POLLY_VOICE`, `POLLY_ENGINE` |
 
 ## Prerequisites
 

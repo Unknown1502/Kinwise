@@ -14,6 +14,7 @@ import {
   screeningView,
   timelineView,
   todayView,
+  tvReadResult,
   visitResult,
 } from './schemas.js';
 import { UI_HTML } from './ui-bundle.generated.js';
@@ -40,6 +41,7 @@ const ICON = {
 const INSTRUCTIONS = `Kinwise is a consent-first family safety add-on for an older adult who lives alone.
 - When the resident describes a phone call, letter, text or visitor request involving money, a bank, a government agency, gold, gift cards, crypto or a courier, call kinwise_check_call with what was said, in their words. Then read the advice calmly.
 - Route every "remind me…" request from the resident to kinwise_add_reminder. If it returns a followUp, say it.
+- When the resident asks to hear or see their messages or their day "on the TV", call kinwise_read_on_tv; the living-room TV reads it aloud.
 - Never pressure, shame or alarm. Kinwise advises; it never controls. The resident can always dismiss.
 - Family members (caregivers) see signals only: never transcripts, recordings or reminder text.`;
 
@@ -197,6 +199,23 @@ export function buildMcpServer(identity: Identity, service: KinwiseService): Mcp
         const r = await service.setPrivacyHour(identity, minutes);
         const out = { active: !!r.until, untilLabel: r.untilLabel };
         return ok(r.until ? `Privacy time is on until ${r.untilLabel}. I won't notice the door until then.` : 'Privacy time is off.', out);
+      }),
+    );
+
+    server.registerTool(
+      'kinwise_read_on_tv',
+      {
+        title: 'Read it out on the TV',
+        description:
+          "Have the resident's living-room TV read something aloud and show it: the family messages, or today's plan (expected visitors and reminders). Use when the resident asks to hear or see their messages or their day on the TV.",
+        inputSchema: z.object({ topic: z.enum(['messages', 'today']).describe('What the TV should read: family messages, or today\'s plan') }),
+        outputSchema: tvReadResult,
+        annotations: { title: 'Read it out on the TV', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        icons: [ICON],
+      },
+      guard(async ({ topic }) => {
+        const r = await service.readOnTv(identity, topic);
+        return ok(topic === 'messages' ? 'Okay, reading your messages on the TV now.' : "Okay, reading today's plan on the TV now.", r);
       }),
     );
   }

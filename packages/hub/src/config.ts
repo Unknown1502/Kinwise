@@ -29,6 +29,8 @@ export interface HubConfig {
   demoTimezone: string;
   /** Absolute URL of the caregiver's recorded Pause message (optional). */
   demoPauseVideoUrl?: string;
+  /** Natural voice for the Echo simulator and the TV: Amazon Polly, or off (clients fall back or stay silent). */
+  speech: { provider: 'polly' | 'off'; voice: string; engine: 'neural' | 'standard' | 'generative'; region: string };
 }
 
 function json<T>(raw: string | undefined, fallback: T): T {
@@ -87,6 +89,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
     demoHouseholdId: env.DEMO_HOUSEHOLD_ID ?? DEMO_HOUSEHOLD_ID,
     demoTimezone: env.DEMO_TIMEZONE ?? 'America/New_York',
     demoPauseVideoUrl: env.DEMO_PAUSE_VIDEO_URL || undefined,
+    speech: {
+      provider: env.SPEECH === 'polly' ? 'polly' : 'off',
+      voice: env.POLLY_VOICE ?? 'Joanna',
+      engine: (env.POLLY_ENGINE ?? 'neural') as HubConfig['speech']['engine'],
+      region,
+    },
   };
 }
 

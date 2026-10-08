@@ -47,6 +47,17 @@ describe('KinwiseStack', () => {
     }
   });
 
+  it('gives the hub a natural voice: Amazon Polly, synthesize only', () => {
+    t.hasResourceProperties('AWS::Lambda::Function', {
+      Environment: { Variables: Match.objectLike({ SPEECH: 'polly', POLLY_VOICE: 'Joanna', POLLY_ENGINE: 'neural' }) },
+    });
+    t.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([Match.objectLike({ Action: 'polly:SynthesizeSpeech', Effect: 'Allow', Resource: '*' })]),
+      },
+    });
+  });
+
   it('implements the Alexa+ two-tier OAuth scopes', () => {
     t.hasResourceProperties('AWS::Cognito::UserPoolResourceServer', {
       Identifier: 'kinwise',

@@ -6,6 +6,7 @@ import { AgentCoreConcierge, HttpConcierge, type ConciergeClient } from './http/
 import { createApp } from './http/app.js';
 import { demoHousehold } from './seed.js';
 import { KinwiseService } from './services/kinwise.js';
+import { PollySynth, type SpeechSynth } from './speech/speech.js';
 import { MultiNotifier, OutboxNotifier, SnsNotifier, type Notifier } from './services/notifier.js';
 import { DynamoStore } from './store/dynamo.js';
 import { MemoryStore } from './store/memory.js';
@@ -21,7 +22,8 @@ async function resolveSecrets(config: HubConfig): Promise<{ config: HubConfig; d
   return { config: resolved, demoIdentities };
 }
 
-export async function bootstrap(input: HubConfig) {
+/** `inject` lets tests swap in a fake voice instead of calling Amazon Polly. */
+export async function bootstrap(input: HubConfig, inject: { speech?: SpeechSynth } = {}) {
   const { config, demoIdentities } = await resolveSecrets(input);
 
   const store: Store =
@@ -56,6 +58,10 @@ export async function bootstrap(input: HubConfig) {
       ? new HttpConcierge(config.conciergeUrl)
       : undefined;
 
+  const speech: SpeechSynth | undefined =
+    inject.speech ??
+    (config.speech.provider === 'polly' ? new PollySynth(config.speech.voice, config.speech.engine, config.speech.region) : undefined);
+
   const seed = () => {
     const fresh = demoHousehold(new Date(), config.demoTimezone, config.demoPauseVideoUrl);
     return { ...fresh, household: { ...fresh.household, id: config.demoHouseholdId } };
@@ -69,6 +75,6 @@ export async function bootstrap(input: HubConfig) {
     await store.save({ ...seed(), version: (current?.version ?? 0) + 1 }, current?.version ?? 0);
   };
 
-  const app = createApp({ config, service, verifier, concierge, outbox, resetDemo });
+  const app = createApp({ config, service, verifier, concierge, outbox, resetDemo, speech });
   return { app, service, store, outbox, verifier };
 }

@@ -872,6 +872,34 @@ button:disabled {
   opacity: 0.6;
   animation: breathe 2.4s ease-in-out infinite;
 }
+/* Hands-free: a dim, steady light means the mic is on and waiting for "Alexa". */
+.wake-waiting.phase-idle .light-bar {
+  opacity: 0.28;
+}
+.wake-hint {
+  position: absolute;
+  right: 28px;
+  bottom: 18px;
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 15px;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.voice-chip {
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.voice-chip.natural {
+  color: var(--text);
+  border-color: var(--brand);
+}
 
 /* ── Priya's phone ── */
 .phone {

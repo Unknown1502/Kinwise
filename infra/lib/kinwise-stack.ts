@@ -153,9 +153,15 @@ export class KinwiseStack extends Stack {
         DEV_ROUTES: String(props.devRoutes),
         SEED_DEMO: 'true',
         DEMO_TIMEZONE: props.demoTimezone,
+        // Natural voice for the Echo simulator and the Fire TV (Amazon Polly neural).
+        SPEECH: 'polly',
+        POLLY_VOICE: 'Joanna',
+        POLLY_ENGINE: 'neural',
       },
     });
     table.grantReadWriteData(hub);
+    // SynthesizeSpeech has no resource-level permissions, so it can only be granted on "*".
+    hub.addToRolePolicy(new iam.PolicyStatement({ actions: ['polly:SynthesizeSpeech'], resources: ['*'] }));
     alerts.grantPublish(hub);
     ingestSecret.grantRead(hub);
     demoSeed.grantRead(hub);

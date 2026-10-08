@@ -15,6 +15,7 @@ import {
   type RiskLevel,
   type SignalCategory,
   type TimelineEntry,
+  type TvCue,
   type VisitorEvent,
 } from '../domain/types.js';
 import { describeRecurrence, validateRecurrence } from '../domain/visits.js';
@@ -29,6 +30,8 @@ import {
   resident,
   safetyView,
   signsFor,
+  spokenDay,
+  spokenMessages,
   timelineView,
   todayView,
   type AlertView,
@@ -83,8 +86,13 @@ export interface TvStateView {
   consent: Consent;
   privacyHourUntil?: string;
   accessLog: Array<{ timeLabel: string; actor: string; action: string }>;
+  /** What Alexa last asked the TV to read aloud, for two minutes. */
+  cue?: { id: string; topic: TvCue['topic']; text: string };
   serverTime: string;
 }
+
+/** How long a "read it on the TV" request stays pending for a TV that is polling. */
+export const TV_CUE_MS = 2 * 60_000;
 
 export interface ExplainView {
   alert?: AlertView;
@@ -623,6 +631,18 @@ export class KinwiseService {
 
   // ───────────────────────────── TV ─────────────────────────────
 
+  /** Alexa → TV: the TV reads the family messages or today's plan aloud (it picks this up within one poll). */
+  async readOnTv(actor: Identity, topic: TvCue['topic']): Promise<{ topic: TvCue['topic']; text: string; deliveredTo: string }> {
+    this.requireResident(actor);
+    if (topic !== 'messages' && topic !== 'today') throw new ValidationError('topic must be messages or today');
+    return this.mutate(actor.householdId, (s, now) => {
+      const view = todayView(s, now, true);
+      const text = topic === 'messages' ? spokenMessages(view) : spokenDay(view);
+      s.tvCue = { id: this.ids('cue'), topic, text, at: now.toISOString() };
+      return { topic, text, deliveredTo: `${resident(s).name}'s TV` };
+    });
+  }
+
   async tvState(actor: Identity): Promise<TvStateView> {
     this.requireResident(actor);
     const { state, now } = await this.read(actor.householdId);
@@ -646,6 +666,10 @@ export class KinwiseService {
       consent: state.consent,
       privacyHourUntil: isPrivacyHour(state.privacyHourUntil, now) ? state.privacyHourUntil : undefined,
       accessLog: state.accessLog.slice(0, 20).map((e) => ({ timeLabel: formatClock(new Date(e.at), tz), actor: e.actor, action: e.action })),
+      cue:
+        state.tvCue && now.getTime() - Date.parse(state.tvCue.at) < TV_CUE_MS
+          ? { id: state.tvCue.id, topic: state.tvCue.topic, text: state.tvCue.text }
+          : undefined,
       serverTime: now.toISOString(),
     };
   }

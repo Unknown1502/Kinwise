@@ -128,6 +128,28 @@ export function activeAlert(state: HouseholdState): Alert | undefined {
     .sort((a, b) => ALERT_PRIORITY[a.kind] - ALERT_PRIORITY[b.kind] || Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
 }
 
+/** "You have 2 messages. Priya, at 1:02 PM: Love you Mom!…": family notes, as the TV reads them aloud. */
+export function spokenMessages(v: Pick<TodayView, 'messages'>): string {
+  const latest = v.messages.slice(0, 3);
+  if (latest.length === 0) return 'There are no messages from family today.';
+  const intro =
+    v.messages.length > latest.length
+      ? `You have ${v.messages.length} messages. Here are the latest ${latest.length}.`
+      : latest.length === 1
+        ? 'You have one message.'
+        : `You have ${latest.length} messages.`;
+  return [intro, ...latest.map((m) => `${m.from}, at ${m.timeLabel}: ${m.text}`)].join(' ');
+}
+
+/** "Here's your day. Maria (home-health aide) is expected from 2:00 PM to 3:00 PM. At 4:30 PM: Call the pharmacy." */
+export function spokenDay(v: Pick<TodayView, 'visits' | 'reminders'>): string {
+  const lines = [
+    ...v.visits.map((x) => `${x.label} is expected ${/^\d/.test(x.timeLabel) ? 'from ' : ''}${x.timeLabel.replace(/\s*[–-]\s*/, ' to ')}.`),
+    ...(v.reminders ?? []).map((r) => `At ${r.timeLabel}: ${r.text.charAt(0).toUpperCase()}${r.text.slice(1)}.`),
+  ];
+  return lines.length ? `Here's your day. ${lines.join(' ')}` : 'Nothing is planned for today.';
+}
+
 export function todayView(state: HouseholdState, now: Date, includeReminders: boolean): TodayView {
   const tz = state.household.timezone;
   const local = zonedParts(now, tz);

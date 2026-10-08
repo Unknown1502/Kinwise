@@ -13,6 +13,14 @@ The simulator shows what Kinwise looks like on an Alexa+ smart display: you spea
 
 When the simulator receives a tool call without `uiResourceUri`, it reads the tool's `_meta.ui.resourceUri` from `tools/list`, which is how a real host discovers card UIs.
 
+## Voice
+
+- **Natural voice.** Alexa's replies are spoken by **Amazon Polly** (neural voice Joanna) through the hub: `POST {hub}/speech` returns a short-lived signed link, and the simulator plays it. If the hub has no voice configured, or you are offline, it falls back to the browser's own voice. A chip in the top bar shows which voice is speaking.
+- **Hands-free "Alexa".** Turn on **Hands-free “Alexa”** (Chrome or Edge) and just talk: *"Alexa, is this call real?"*. Saying "Alexa" on its own listens for the next sentence for 8 seconds. A dim light along the bottom of the screen means the microphone is waiting for "Alexa"; it brightens while you speak, and your words appear live. Listening pauses while Alexa thinks or speaks, so she never hears herself.
+- **Talk to the TV.** *"Alexa, read my messages on the TV"* or *"show my day on the TV"* calls `kinwise_read_on_tv`, and Asha's TV reads it aloud within one poll (2 s).
+
+Browsers only transcribe speech with a real microphone; automated test browsers return no text, so the wake-word logic is covered by unit tests (`src/lib/voice.test.ts`).
+
 ## Security and accessibility
 
 - Card HTML runs only in sandboxed `srcdoc` iframes, without `allow-same-origin`, so each card gets an opaque origin. The host never uses `innerHTML` for server data, and all text is rendered by React. Cards can open only `http(s)` links, in a new tab with `noopener`.

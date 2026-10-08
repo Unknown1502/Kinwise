@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Image, StyleSheet, View} from 'react-native';
 import backdrop from '../assets/home-bg.png';
 import {SpatialNavigationDeviceTypeProvider} from 'react-tv-space-navigation';
@@ -10,6 +10,7 @@ import {asset} from './components/asset';
 import {getConfig} from './config';
 import {useHubState} from './hooks/useHubState';
 import {useBack} from './input/backBus';
+import {callingLine, narration} from './logic/narration';
 import {selectScreen} from './logic/selectScreen';
 import {ExpectedToast} from './overlays/ExpectedToast';
 import {GentleOverlay} from './overlays/GentleOverlay';
@@ -21,6 +22,7 @@ import {PauseScreen} from './screens/PauseScreen';
 import {SettingsScreen} from './screens/SettingsScreen';
 import {colors} from './theme/theme';
 import type {AlertAction, AlertView, ConsentKey, ProposalDecision, TvStateView} from './types';
+import {useVoice} from './voice/useVoice';
 
 type Route = 'home' | 'settings';
 interface Notice {
@@ -68,6 +70,8 @@ export function App({client: injected}: AppProps = {}) {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [pauseError, setPauseError] = useState<string | undefined>();
   const [onboardingError, setOnboardingError] = useState<string | undefined>();
+  const [voiceOn, setVoiceOn] = useState(true);
+  const voice = useVoice(client, voiceOn);
 
   useEffect(() => watchScreenReader(), []);
 
@@ -116,6 +120,22 @@ export function App({client: injected}: AppProps = {}) {
 
   const state = hub.state;
   const selection = state ? selectScreen(state, {hiddenAlertIds: hidden}) : undefined;
+
+  // The TV talks: say what changed, wherever it came from (remote, Alexa, Priya's phone, the doorbell).
+  const spokenRef = useRef<TvStateView | undefined>(undefined);
+  useEffect(() => {
+    if (!state) return;
+    const prev = spokenRef.current;
+    spokenRef.current = state;
+    const lines = narration(prev, state);
+    if (lines.length === 0) return;
+    const newAlert = !!state.activeAlert && state.activeAlert.id !== prev?.activeAlert?.id;
+    if (newAlert) voice.speakNow(lines);
+    else voice.speak(lines);
+    if (prev && state.cue && state.cue.id !== prev.cue?.id) {
+      setNotice({text: state.cue.topic === 'messages' ? 'Reading your messages aloud.' : "Reading today's plan aloud.", tone: 'ok'});
+    }
+  }, [state, voice]);
   const alert = selection?.alert;
   const showPause = !calling && selection?.screen === 'pause';
   const gentle = !calling && !showPause && selection?.overlay === 'gentle' ? alert : undefined;
@@ -139,6 +159,7 @@ export function App({client: injected}: AppProps = {}) {
           hide(target.id);
           if (action === 'call_family') {
             setCalling(target.caregiverName);
+            voice.speakNow([callingLine(target.caregiverName)]);
           } else {
             say(res.message);
           }
@@ -157,7 +178,7 @@ export function App({client: injected}: AppProps = {}) {
         },
       );
     },
-    [client, hide, run, say],
+    [client, hide, run, say, voice],
   );
 
   const togglePrivacy = useCallback(
@@ -291,6 +312,9 @@ export function App({client: injected}: AppProps = {}) {
         onDecide={(id, d) => void decide(id, d)}
         onCloseSafety={() => void closeSafety()}
         onBack={() => setRoute('home')}
+        voiceOn={voiceOn}
+        onVoice={setVoiceOn}
+        onTestVoice={() => voice.speakNow([`Hello ${state.resident.name}. This is how Kinwise sounds when it reads things aloud.`])}
       />
     );
   } else {

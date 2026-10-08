@@ -26,6 +26,10 @@ export interface SettingsScreenProps {
   onDecide: (visitId: string, decision: ProposalDecision) => void;
   onCloseSafety: () => void;
   onBack: () => void;
+  /** Whether the TV reads visitors, messages and changes aloud. */
+  voiceOn: boolean;
+  onVoice: (on: boolean) => void;
+  onTestVoice: () => void;
 }
 
 const PRIVACY_CHOICES = [
@@ -43,7 +47,19 @@ function focusSafely(ref: React.RefObject<SpatialNavigationNodeRef>) {
 }
 
 /** Consent, privacy time, proposals, the access log and the safety watch, all owned by the resident. */
-export function SettingsScreen({state, active, busyKey, onToggle, onPrivacy, onDecide, onCloseSafety, onBack}: SettingsScreenProps) {
+export function SettingsScreen({
+  state,
+  active,
+  busyKey,
+  onToggle,
+  onPrivacy,
+  onDecide,
+  onCloseSafety,
+  onBack,
+  voiceOn,
+  onVoice,
+  onTestVoice,
+}: SettingsScreenProps) {
   const {today, consent, pendingProposals, accessLog} = state;
   const caregiver = state.caregiver.name;
   const safety = today.safety;
@@ -104,6 +120,21 @@ export function SettingsScreen({state, active, busyKey, onToggle, onPrivacy, onD
                     style={styles.rowGap}
                   />
                 ))}
+              </SpatialNavigationView>
+            </Section>
+
+            <Section title="Voice" icon="volume-2" color={colors.sun}>
+              <SpatialNavigationView direction="vertical">
+                <ToggleRow
+                  title="Read things aloud"
+                  explanation="The TV says visitors at the door, new messages and changes out loud, and anything you ask Alexa to read."
+                  value={voiceOn}
+                  onToggle={onVoice}
+                  style={styles.rowGap}
+                />
+              </SpatialNavigationView>
+              <SpatialNavigationView direction="horizontal" style={styles.buttonRow}>
+                <FocusButton icon="volume-2" label="Hear the voice" onSelect={onTestVoice} />
               </SpatialNavigationView>
             </Section>
 

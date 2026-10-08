@@ -96,3 +96,9 @@ export const messageResult = z.object({ id: z.string(), deliveredTo: z.string() 
 
 export const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 export const hhmm = z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, 'Use 24-hour HH:MM');
+
+export const tvReadResult = z.object({
+  topic: z.enum(['messages', 'today']),
+  text: z.string(),
+  deliveredTo: z.string(),
+});

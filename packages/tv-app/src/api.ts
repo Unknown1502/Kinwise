@@ -90,6 +90,12 @@ export class HubClient {
     return this.request<SafetyView>('POST', '/tv/safety/close', {});
   }
 
+  /** A short-lived link to `text` spoken in the hub's natural voice (Amazon Polly). Plays without auth headers. */
+  async speechUrl(text: string): Promise<string | undefined> {
+    const r = await this.request<{url?: string}>('POST', '/speech', {text});
+    return typeof r?.url === 'string' ? r.url : undefined;
+  }
+
   /** Resolve a hub-relative media path (e.g. "/media/priya-pause.mp4") against the hub URL. */
   mediaUrl(path: string | undefined): string | undefined {
     return resolveMediaUrl(this.baseUrl, path);

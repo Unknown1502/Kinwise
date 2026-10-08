@@ -41,6 +41,9 @@ def test_reminder_without_time_defaults_to_one_hour():
         ("resident", "Why did my TV pause?", "kinwise_explain_last_alert"),
         ("resident", "Give me an hour of privacy", "kinwise_set_privacy_hour"),
         ("resident", "Call Priya", "call_family"),
+        ("resident", "Read my messages on the TV", "kinwise_read_on_tv"),
+        ("resident", "Alexa, read my messages", "kinwise_read_on_tv"),
+        ("resident", "Show my day on the TV", "kinwise_read_on_tv"),
         ("caregiver", "How's Mom's day going?", "kinwise_get_day_timeline"),
         ("caregiver", "Why did Kinwise alert?", "kinwise_explain_last_alert"),
         ("caregiver", "Send Mom a message: Dinner Sunday? ❤️", "kinwise_send_family_message"),
@@ -50,6 +53,13 @@ def test_reminder_without_time_defaults_to_one_hour():
 )
 def test_intents(persona, text, tool):
     assert classify(persona, text, NOW).tool == tool
+
+
+def test_tv_topics():
+    assert classify("resident", "Read my messages on the TV", NOW).args == {"topic": "messages"}
+    assert classify("resident", "What's on today? Put it on the TV", NOW).args == {"topic": "today"}
+    assert classify("resident", "Why did my TV pause?", NOW).tool == "kinwise_explain_last_alert"
+    assert classify("resident", "What's happening today?", NOW).tool == "kinwise_get_today"
 
 
 def test_privacy_minutes():

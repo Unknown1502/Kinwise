@@ -165,3 +165,25 @@ export function describeDecision(r: VisitorResult): string {
       return `Decision: ${r.decision}`;
   }
 }
+
+/** POST {hub}/speech — a short-lived link to `text` in the hub's natural voice (Amazon Polly), or undefined. */
+export async function requestSpeech(
+  hubUrl: string,
+  token: string,
+  text: string,
+  opts: { fetchImpl?: FetchImpl } = {},
+): Promise<{ url: string; voice: string } | undefined> {
+  const f = opts.fetchImpl ?? defaultFetch;
+  try {
+    const res = await f(`${hubUrl}/speech`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) return undefined;
+    const body = (await readJson(res)) as { url?: unknown; voice?: unknown } | undefined;
+    return typeof body?.url === 'string' ? { url: body.url, voice: typeof body.voice === 'string' ? body.voice : 'natural' } : undefined;
+  } catch {
+    return undefined;
+  }
+}

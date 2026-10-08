@@ -173,6 +173,14 @@ export interface TimelineEntry {
   text: string;
 }
 
+/** Something Alexa asked the living-room TV to read aloud (the TV plays it once, by id). */
+export interface TvCue {
+  id: string;
+  topic: 'messages' | 'today';
+  text: string;
+  at: string;
+}
+
 export interface HouseholdState {
   version: number;
   household: Household;
@@ -189,6 +197,7 @@ export interface HouseholdState {
   timeline: TimelineEntry[];
   processedEventIds: string[];
   ignoredDoorEvents: number;
+  tvCue?: TvCue;
 }
 
 export const CAPS = {

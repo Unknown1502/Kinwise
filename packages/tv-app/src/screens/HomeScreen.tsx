@@ -242,10 +242,10 @@ function NewBadge() {
   );
 }
 
-/** "Good afternoon, Asha", from the household clock. */
+/** "Good afternoon, Asha", from the household clock. In the small hours it is just "Hello". */
 function greeting(clockLabel: string, name: string): string {
   const part = dayPart(clockLabel);
-  const hello = part === 'morning' ? 'Good morning' : part === 'afternoon' ? 'Good afternoon' : part ? 'Good evening' : 'Hello';
+  const hello = part === 'morning' ? 'Good morning' : part === 'afternoon' ? 'Good afternoon' : part === 'evening' ? 'Good evening' : 'Hello';
   return `${hello}, ${name}`;
 }
 

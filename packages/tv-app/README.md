@@ -160,6 +160,18 @@ Pause aloud, and selecting **Call Priya** notifies the caregiver.
 - **Calm Pause.** The Pause turns the whole screen persimmon, not red. A stray Back press never
   closes it. Dismiss is always one press away.
 
+## Voice
+
+The TV says what changed, wherever the change came from (the remote, Alexa, Priya's phone or the
+Ring doorbell): the Pause and other visitors at the door, new family notes, privacy time starting
+and ending, the safety watch, the "Calling Priya" confirmation, and anything Alexa asks the TV to
+read (`kinwise_read_on_tv`). `src/logic/narration.ts` decides the words (unit-tested);
+`src/voice/useVoice.ts` fetches each line from the hub as natural speech (Amazon Polly) and plays
+it with Vega's `AudioPlayer` (`src/voice/player.vega.ts`) or an `<audio>` element in the preview.
+The hub hands out signed links (`GET /speech/<token>.mp3`) because Vega's player cannot send an
+Authorization header. **Settings & privacy → Voice** turns reading aloud off, and **Hear the
+voice** plays a sample. If the hub has no voice configured, the TV stays quiet.
+
 ## Design
 
 A warm family display, in the spirit of an Echo Show home screen. The time and a greeting

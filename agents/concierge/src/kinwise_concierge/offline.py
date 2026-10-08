@@ -111,6 +111,11 @@ def classify(persona: str, text: str, now: datetime) -> Intent:
             return Intent("kinwise_set_privacy_hour", {"minutes": max(0, min(720, minutes))})
         if re.search(r"\bwhy\b.*\b(pause|alert|stop)", t):
             return Intent("kinwise_explain_last_alert", {})
+        on_tv = re.search(r"\b(tv|television|telly)\b", t)
+        if re.search(r"\b(messages?|notes?)\b", t) and (on_tv or re.search(r"\b(read|hear)\b", t)):
+            return Intent("kinwise_read_on_tv", {"topic": "messages"})
+        if on_tv and re.search(r"\b(today|day|plan|schedule)\b", t):
+            return Intent("kinwise_read_on_tv", {"topic": "today"})
         if re.search(r"\b(call|ring|phone)\s+(priya|my daughter|family)\b", t):
             return Intent("call_family", {})
         if _SCAM_WORDS.search(t) and not re.search(r"\btoday\b.*\bhappening\b", t):
@@ -134,8 +139,8 @@ def classify(persona: str, text: str, now: datetime) -> Intent:
 
 
 HELP = {
-    "resident": "I can set reminders, give you a second opinion on a call, tell you who's expected today, or give "
-    "you some privacy time.",
+    "resident": "I can set reminders, give you a second opinion on a call, tell you who's expected today, give "
+    "you some privacy time, or read your messages on the TV.",
     "caregiver": "I can tell you how your mom's day is going, explain an alert, add an expected visitor for her "
     "approval, or send a message to her TV.",
 }

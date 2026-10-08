@@ -8,6 +8,7 @@ import type { HubConfig } from '../config.js';
 import type { AlertAction, Recurrence, VisitorEvent } from '../domain/types.js';
 import { buildMcpServer, SERVER_VERSION } from '../mcp/server.js';
 import { KinwiseService, NotFoundError, ValidationError } from '../services/kinwise.js';
+import { signSpeech, speechKey, speechText, verifySpeech, type SpeechSynth } from '../speech/speech.js';
 import type { OutboxNotifier } from '../services/notifier.js';
 import type { ConciergeClient } from './concierge.js';
 import { verifySignature } from './hmac.js';
@@ -21,6 +22,8 @@ export interface AppDeps {
   outbox?: OutboxNotifier;
   /** Dev only: reseed the demo household. */
   resetDemo?: () => Promise<void>;
+  /** Natural voice (Amazon Polly); absent when speech is off. */
+  speech?: SpeechSynth;
 }
 
 type Env = { Variables: { identity: Identity } };
@@ -204,6 +207,39 @@ export function createApp(deps: AppDeps): Hono<Env> {
       hubMcpUrl: `${baseUrl(c)}/mcp`,
     });
     return c.json(out);
+  });
+
+  // ── Natural voice (Amazon Polly) for the Echo simulator and the TV ──
+  const voiceKey = speechKey(config.ingestSecret);
+  const speechOff = (c: Context) =>
+    c.json({ error: 'speech_unavailable', error_description: 'Natural voice is not configured on this hub' }, 503);
+
+  app.post('/speech', async (c) => {
+    const auth = await authenticate(c);
+    if (auth instanceof Response) return auth;
+    if (auth.role === 'service') throw new PermissionError('A household member or device must ask for speech');
+    if (!deps.speech) return speechOff(c);
+    const body = await c.req.json<{ text?: string }>().catch(() => ({}) as { text?: string });
+    const text = speechText(typeof body.text === 'string' ? body.text : '');
+    if (!text) throw new ValidationError('Nothing to say');
+    const token = signSpeech(voiceKey, text, Date.now());
+    return c.json({ url: `${baseUrl(c)}/speech/${token}.mp3`, voice: deps.speech.voice });
+  });
+
+  // No Authorization header here: Vega's AudioPlayer can't send one. The signed token authorizes it.
+  app.get('/speech/:token', async (c) => {
+    if (!deps.speech) return speechOff(c);
+    const text = verifySpeech(voiceKey, c.req.param('token').replace(/\.mp3$/, ''), Date.now());
+    if (!text) return c.json({ error: 'invalid_or_expired', error_description: 'This speech link is invalid or has expired' }, 403);
+    let audio: Uint8Array;
+    try {
+      audio = await deps.speech.synthesize(text);
+    } catch (err) {
+      console.error('[speech] synthesis failed', err instanceof Error ? err.message : err);
+      return c.json({ error: 'speech_failed', error_description: 'The voice service did not answer' }, 502);
+    }
+    console.log(JSON.stringify({ msg: 'speech', chars: text.length, bytes: audio.byteLength, voice: deps.speech.voice }));
+    return c.body(audio as Uint8Array<ArrayBuffer>, 200, { 'content-type': 'audio/mpeg', 'cache-control': 'private, max-age=900' });
   });
 
   // ── Dev-only helpers for the local demo ──

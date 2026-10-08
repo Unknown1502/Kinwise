@@ -103,6 +103,8 @@ export interface TvStateView {
   consent: Consent;
   privacyHourUntil?: string;
   accessLog: AccessLogEntry[];
+  /** Something Alexa asked this TV to read aloud (present for two minutes; play each id once). */
+  cue?: {id: string; topic: 'messages' | 'today'; text: string};
   serverTime: string;
 }
 

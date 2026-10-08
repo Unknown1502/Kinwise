@@ -30,6 +30,8 @@ import shieldCheckDark from '../../assets/icons/shield-check-dark.png';
 import shieldCheckLight from '../../assets/icons/shield-check-light.png';
 import userRoundDark from '../../assets/icons/user-round-dark.png';
 import userRoundLight from '../../assets/icons/user-round-light.png';
+import volume2Dark from '../../assets/icons/volume-2-dark.png';
+import volume2Light from '../../assets/icons/volume-2-light.png';
 import xDark from '../../assets/icons/x-dark.png';
 import xLight from '../../assets/icons/x-light.png';
 import {asset} from './asset';
@@ -51,6 +53,7 @@ const ICONS = {
   'shield-alert': {dark: asset(shieldAlertDark), light: asset(shieldAlertLight)},
   'shield-check': {dark: asset(shieldCheckDark), light: asset(shieldCheckLight)},
   'user-round': {dark: asset(userRoundDark), light: asset(userRoundLight)},
+  'volume-2': {dark: asset(volume2Dark), light: asset(volume2Light)},
   'x': {dark: asset(xDark), light: asset(xLight)},
 } as const;
 
