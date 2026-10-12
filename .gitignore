@@ -40,3 +40,4 @@ packages/hub/ui/dist/
 
 # CDK deploy outputs (account-specific)
 infra/cdk-outputs.json
+.aqg/
