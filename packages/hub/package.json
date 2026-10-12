@@ -14,7 +14,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "conformance": "tsx scripts/conformance.ts"
+    "conformance": "tsx scripts/conformance.ts",
+    "scenarios": "tsx scripts/scenarios.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agentcore": "^3.900.0",

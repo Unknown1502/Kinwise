@@ -27,6 +27,8 @@ No single device sees both steps. The conversation happens in one place and the 
 
 On ordinary days the TV is Asha's calm home screen: expected visitors (the gardener at 10 doesn't trigger anything), reminders and notes from family.
 
+**Kinwise connects the dots.** The Pause tells Asha *why*: "At 10:20 AM you asked Kinwise about a call, and it matched courier-scam warning signs." It comes from the time and kind of each earlier warning, never the words said. [`docs/evaluation.md`](docs/evaluation.md) runs the same situations through Kinwise and a door-only rule: Kinwise raises no false urgent alerts and tells the family once, where a door-only rule either alarms on every delivery or catches nothing (and Kinwise's one miss is reported). Rerun it with `npm run scenarios -w @kinwise/hub`.
+
 **Kinwise talks.** The TV reads new family notes, visitors at the door, privacy time and the safety watch aloud in a natural **Amazon Polly** voice. Asha can say *"Alexa, read my messages on the TV"* or *"show my day on the TV"* and the TV reads them out. On the Echo simulator, Alexa answers in the same voice, and hands-free mode means she only has to say *"Alexa, …"*.
 
 ## How each Amazon technology is used at runtime
