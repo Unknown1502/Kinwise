@@ -35,7 +35,8 @@ export function narration(prev: TvStateView | undefined, next: TvStateView): str
 
 export function alertLine(alert: AlertView, residentName: string): string {
   if (alert.kind === 'pause') {
-    return `${residentName}, someone is at your door, and no visit is expected right now. Please pause before you open it. Press OK to call ${alert.caregiverName}.`;
+    const because = alert.because ? ` ${alert.because}` : '';
+    return `${residentName}, someone is at your door, and no visit is expected right now.${because} Please pause before you open it. Press OK to call ${alert.caregiverName}.`;
   }
   if (alert.kind === 'gentle') return "Someone is at the door. They're not on today's list, and you don't have to answer.";
   return `${alert.visitLabel ?? 'Your visitor'} is at the door. They're on today's list.`;

@@ -10,6 +10,13 @@ describe('narration', () => {
     ]);
   });
 
+  it('says where the Pause warning came from, when known', () => {
+    const alert = pauseAlert({because: 'At 10:20 AM you asked Kinwise about a call, and it matched courier-scam warning signs.'});
+    expect(alertLine(alert, 'Asha')).toBe(
+      'Asha, someone is at your door, and no visit is expected right now. At 10:20 AM you asked Kinwise about a call, and it matched courier-scam warning signs. Please pause before you open it. Press OK to call Priya.',
+    );
+  });
+
   it('announces a new alert once', () => {
     const before = homeState();
     const after = withAlert(before, gentleAlert());

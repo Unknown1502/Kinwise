@@ -28,6 +28,7 @@ export const alertView = z.object({
   riskLevel: z.enum(['elevated', 'high']).optional(),
   signs: z.array(sign),
   caregiverName: z.string(),
+  because: z.string().optional(),
   pauseMessage: z.object({ from: z.string(), text: z.string(), videoUrl: z.string().optional() }).optional(),
   resolution: z.enum(['call_family', 'known_person', 'dismiss']).optional(),
   resolvedLabel: z.string().optional(),

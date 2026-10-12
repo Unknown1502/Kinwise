@@ -46,6 +46,13 @@ describe('pause copy', () => {
     );
   });
 
+  it('connects the dots: says where the warning came from when the hub knows', () => {
+    expect(pauseLine(pauseAlert({because: 'At 10:20 AM you asked Kinwise about a call, and it matched courier-scam warning signs.'}))).toBe(
+      'No visit is expected right now. At 10:20 AM you asked Kinwise about a call, and it matched courier-scam warning signs.',
+    );
+    expect(pauseAnnouncement(pauseAlert({because: 'At 10:20 AM you asked Kinwise about a call, and it matched courier-scam warning signs.'}))).toContain('you asked Kinwise about a call');
+  });
+
   it('uses the singular for one sign', () => {
     expect(pauseLine(pauseAlert({signs: [SIGNS[0]!]}))).toBe(
       'No visit is expected right now. Earlier today, Kinwise noticed 1 courier-scam warning sign.',

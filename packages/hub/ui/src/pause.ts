@@ -10,6 +10,8 @@ interface AlertData {
   riskLevel?: 'elevated' | 'high';
   signs: Sign[];
   caregiverName: string;
+  /** Where the warning came from, e.g. "At 10:20 AM you asked Kinwise about a call..." (resident only). */
+  because?: string;
   pauseMessage?: { from: string; text: string };
   resolution?: 'call_family' | 'known_person' | 'dismiss';
   resolvedLabel?: string;
@@ -44,7 +46,7 @@ function render(p: Payload, ctx: CardContext): Node {
         'div',
         { class: 'banner pause' },
         el('span', { class: 'icon', 'aria-hidden': 'true' }, '⏸'),
-        el('div', {}, el('strong', {}, 'No visit is expected right now.'), el('p', {}, `Earlier today, Kinwise noticed ${a.signs.length} courier-scam warning signs.`)),
+        el('div', {}, el('strong', {}, 'No visit is expected right now.'), el('p', {}, a.because ?? `Earlier today, Kinwise noticed ${a.signs.length} courier-scam warning signs.`)),
       ),
     );
     if (a.pauseMessage) card.append(el('h2', {}, `Message from ${a.pauseMessage.from}`), el('p', { class: 'big' }, `“${a.pauseMessage.text}”`));

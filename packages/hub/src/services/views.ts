@@ -1,5 +1,5 @@
 import { ruleFor } from '../domain/patterns.js';
-import { isWindowActive } from '../domain/risk.js';
+import { ACCUMULATION_HOURS, isWindowActive } from '../domain/risk.js';
 import { formatClock, zonedParts } from '../domain/time.js';
 import type {
   Alert,
@@ -7,6 +7,7 @@ import type {
   Member,
   RiskLevel,
   SignalCategory,
+  SignalRecord,
   TimelineEntry,
 } from '../domain/types.js';
 import { describeRecurrence, visitsForDay } from '../domain/visits.js';
@@ -37,6 +38,8 @@ export interface AlertView {
   riskLevel?: 'elevated' | 'high';
   signs: SignView[];
   caregiverName: string;
+  /** Pause only, resident only: when and how Kinwise first noticed the warning signs. Times and kinds, never words. */
+  because?: string;
   pauseMessage?: { from: string; text: string; videoUrl?: string };
   resolution?: Alert['resolution'];
   resolvedLabel?: string;
@@ -101,7 +104,33 @@ export function safetyView(state: HouseholdState, now: Date): SafetyView {
   };
 }
 
-export function alertView(state: HouseholdState, alert: Alert): AlertView {
+/**
+ * "At 10:15 AM a reminder you saved, and at 10:20 AM a call you asked about, matched courier-scam
+ * warning signs." Built only from the signal records (time + kind), so it can never repeat the words
+ * that were said (privacy rule 3). Reminders are the resident's own (rule 2), so callers pass
+ * `forResident: false` for family members and they get no line at all.
+ */
+export function originLine(state: HouseholdState, alert: Alert): string | undefined {
+  if (alert.kind !== 'pause') return undefined;
+  const tz = state.household.timezone;
+  const at = Date.parse(alert.createdAt);
+  const since = at - ACCUMULATION_HOURS * 3_600_000;
+  const earliest = (source: SignalRecord['source']): string | undefined => {
+    const hits = state.signals
+      .filter((s) => s.source === source && s.categories.length > 0 && Date.parse(s.at) >= since && Date.parse(s.at) <= at)
+      .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+    return hits[0] ? formatClock(new Date(hits[0].at), tz) : undefined;
+  };
+  const reminder = earliest('reminder');
+  const call = earliest('check');
+  const signs = alert.riskLevel === 'high' ? 'courier-scam warning signs' : 'possible scam warning signs';
+  if (reminder && call) return `At ${reminder} a reminder you saved, and at ${call} a call you asked about, matched ${signs}.`;
+  if (call) return `At ${call} you asked Kinwise about a call, and it matched ${signs}.`;
+  if (reminder) return `At ${reminder} a reminder you saved matched ${signs}.`;
+  return undefined;
+}
+
+export function alertView(state: HouseholdState, alert: Alert, opts: { forResident?: boolean } = {}): AlertView {
   const tz = state.household.timezone;
   return {
     id: alert.id,
@@ -114,6 +143,7 @@ export function alertView(state: HouseholdState, alert: Alert): AlertView {
     riskLevel: alert.riskLevel,
     signs: signsFor(alert.categories ?? []),
     caregiverName: primaryCaregiverName(state),
+    because: opts.forResident ? originLine(state, alert) : undefined,
     pauseMessage: alert.kind === 'pause' ? state.household.pauseMessage : undefined,
     resolution: alert.resolution,
     resolvedLabel: alert.resolvedAt ? formatClock(new Date(alert.resolvedAt), tz) : undefined,
@@ -185,7 +215,7 @@ export function todayView(state: HouseholdState, now: Date, includeReminders: bo
       unread: !m.readAt,
     })),
     safety: safetyView(state, now),
-    activeAlert: alert ? alertView(state, alert) : undefined,
+    activeAlert: alert ? alertView(state, alert, { forResident: includeReminders }) : undefined,
     privacyHourUntilLabel: isPrivacyHour(state.privacyHourUntil, now)
       ? formatClock(new Date(state.privacyHourUntil!), tz)
       : undefined,

@@ -48,6 +48,8 @@ export interface AlertView {
   riskLevel?: 'elevated' | 'high';
   signs: SignView[];
   caregiverName: string;
+  /** Pause only: where the warning came from ("At 10:20 AM you asked Kinwise about a call..."). */
+  because?: string;
   pauseMessage?: PauseMessage;
   resolution?: AlertAction;
   resolvedLabel?: string;

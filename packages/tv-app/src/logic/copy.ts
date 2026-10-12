@@ -26,9 +26,10 @@ export function statusPill(state: Pick<TvStateView, 'today' | 'consent'>): Statu
 }
 
 /** "No visit is expected right now. Earlier today, Kinwise noticed 3 courier-scam warning signs." */
-export function pauseLine(alert: Pick<AlertView, 'signs' | 'riskLevel'>): string {
+export function pauseLine(alert: Pick<AlertView, 'signs' | 'riskLevel' | 'because'>): string {
   const n = alert.signs.length;
   const lead = 'No visit is expected right now.';
+  if (alert.because) return `${lead} ${alert.because}`;
   if (n === 0) return `${lead} Earlier today, Kinwise noticed signs of a possible scam.`;
   const kind = alert.riskLevel === 'elevated' ? 'possible scam warning' : 'courier-scam warning';
   return `${lead} Earlier today, Kinwise noticed ${n} ${kind} ${n === 1 ? 'sign' : 'signs'}.`;

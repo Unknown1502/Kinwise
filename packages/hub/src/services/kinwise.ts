@@ -492,7 +492,7 @@ export class KinwiseService {
         message = 'Okay, I closed the alert.';
         addTimeline(s, now, 'alert_resolved', `${residentName} dismissed the alert.`);
       }
-      return { alert: alertView(s, alert), message };
+      return { alert: alertView(s, alert, { forResident: true }), message };
     });
   }
 
@@ -502,7 +502,7 @@ export class KinwiseService {
       const last = s.alerts.find((a) => a.kind !== 'expected');
       const risk = safetyView(s, now);
       if (!last) return { riskWindow: risk, summary: 'There have been no alerts recently.' };
-      const view = alertView(s, last);
+      const view = alertView(s, last, { forResident: actsAsResident(actor) });
       const why =
         last.kind === 'pause'
           ? `A visitor nobody expected arrived while Kinwise was watching for a possible scam (${view.signs.map((x) => x.label.toLowerCase()).join(', ')}).`
@@ -654,7 +654,7 @@ export class KinwiseService {
       resident: { id: resident(state).id, name: resident(state).name },
       caregiver: { name: cg?.name ?? 'Family', relationship: cg?.relationship },
       today: todayView(state, now, true),
-      activeAlert: alert ? alertView(state, alert) : undefined,
+      activeAlert: alert ? alertView(state, alert, { forResident: true }) : undefined,
       pendingProposals: state.expectedVisits
         .filter((v) => v.status === 'proposed')
         .map((v) => ({

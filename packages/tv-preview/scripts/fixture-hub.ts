@@ -25,7 +25,11 @@ const fixtures: Record<string, () => TvStateView> = {
       privacyHourUntil: '2026-10-05T19:19:11.527Z',
     }),
   watching: () => homeState({today: {...home.today, safety: {level: 'high', untilLabel: '8:18 PM', signs: SIGNS}}}),
-  pause: () => withAlert(home, pauseAlert()),
+  pause: () =>
+    withAlert(
+      home,
+      pauseAlert({ because: 'At 10:20 AM you asked Kinwise about a call, and it matched courier-scam warning signs.' }),
+    ),
   'pause-no-message': () => withAlert(home, pauseAlert({pauseMessage: undefined})),
   gentle: () => withAlert(home, gentleAlert()),
   expected: () => withAlert(home, expectedAlert()),
