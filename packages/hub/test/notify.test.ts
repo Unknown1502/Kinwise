@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadConfig, parseWhatsApp } from '../src/config.js';
 import { ackKey, signAck, verifyAck } from '../src/services/ackLink.js';
-import { MultiNotifier, NtfyNotifier, OutboxNotifier, WhatsAppNotifier, type CaregiverNotice, type Notifier } from '../src/services/notifier.js';
+import { MultiNotifier, NtfyNotifier, OutboxNotifier, SnsNotifier, WhatsAppNotifier, type CaregiverNotice, type Notifier } from '../src/services/notifier.js';
 
 const notice = (over: Partial<CaregiverNotice> = {}): CaregiverNotice => ({
   householdId: 'hh-asha',
@@ -212,5 +212,28 @@ describe('config: WhatsApp credentials', () => {
     expect(
       loadConfig(env({ WHATSAPP_ACCOUNT_SID: good.accountSid, WHATSAPP_AUTH_TOKEN: 'tok', WHATSAPP_FROM: good.from, WHATSAPP_TO: good.to })).whatsapp,
     ).toEqual({ creds: good });
+  });
+});
+
+describe('SnsNotifier (email to the caregiver)', () => {
+  const sendAll = async (n: CaregiverNotice, ackUrl: (n: CaregiverNotice) => string | undefined) => {
+    const sent: Array<Record<string, any>> = [];
+    const client = { send: async (cmd: { input: Record<string, any> }) => void sent.push(cmd.input) } as any;
+    const ok = await new SnsNotifier('arn:aws:sns:us-east-1:1:t', ackUrl, client).notify(n);
+    return { ok, sent };
+  };
+
+  it('puts the tap-to-confirm link in the email for a call request', async () => {
+    const { ok, sent } = await sendAll(notice(), (n) => `https://hub.example/ack/${n.callId}`);
+    expect(ok).toBe(true);
+    expect(sent[0]!.Subject).toBe('Kinwise: Asha wants to talk to you now');
+    expect(sent[0]!.Message).toContain('Please call now');
+    expect(sent[0]!.Message).toContain('https://hub.example/ack/call_1');
+  });
+
+  it('has no link on a Pause or a warning, and still says only the signal', async () => {
+    const { sent } = await sendAll(notice({ kind: 'pause', callId: undefined }), () => 'https://hub.example/ack/x');
+    expect(sent[0]!.Message).not.toContain('https://');
+    expect(sent[0]!.Message).toContain('signals only');
   });
 });

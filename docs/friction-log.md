@@ -118,3 +118,15 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
   3. `vega device list` and `vega virtual-device status` can hang indefinitely while the emulator is still booting under memory pressure, and leave stuck `vda` child processes that block later commands.
 - **Minutes lost:** ~60 across several restarts.
 - **Suggestion:** have `vega virtual-device start` detect and clear stale lock files, print the contents of `virtual_device.err` when the device is unresponsive, and make `device list` and `status` time out with a clear message.
+
+### 15. Twilio WhatsApp on a trial account: the sandbox accepts "join", then refuses to send (🟠, first-hand, 2026-10-13, from India)
+- **Task:** message the caregiver on WhatsApp when the resident presses "Call Meera", with no app to install.
+- **Friction, in order:**
+  1. The sandbox shows its own number and join code per account (here +1 737 250 8034 and `join twilio-trial`), not the number in most tutorials. The tutorial number gives an error that does not say the number is wrong.
+  2. A plain `Body` message from the sandbox number is refused with HTTP 400, code **21654**, *"ContentSid Required"*. The error page says it applies when `ContentVariables` is sent without `ContentSid`, and the request had no `ContentVariables`.
+  3. The way out is a Content template. Creating one is refused on a trial account with code **20003**, *"This feature is not available on a Trial account"*, so a free account cannot send WhatsApp from code at all.
+  4. Twilio's *"accepted"* answer means queued, not delivered. Other WhatsApp failures, for example the 24-hour window (error 63016), can arrive only in a later status callback, so a hub that trusts the first HTTP answer can tell the user a message was sent when it was not.
+- **Minutes lost:** ~45, mostly finding that the trial blocks the feature.
+- **Suggestion:** say on the sandbox page that code needs a Content template, and say so at the moment of the 21654 error; let the trial account create `twilio/text` templates for the sandbox; document that `queued` is not `delivered`.
+- **What we did:** kept the WhatsApp sender in the code (it works on a paid Twilio account or can be pointed at Meta's Cloud API), and use e-mail through SNS for the demo.
+

@@ -38,18 +38,26 @@ export class OutboxNotifier implements Notifier {
   }
 }
 
+/** E-mail (and any other SNS subscriber). A call request carries the signed "I'm calling now" link. */
 export class SnsNotifier implements Notifier {
   constructor(
     private readonly topicArn: string,
+    private readonly ackUrl: (notice: CaregiverNotice) => string | undefined = () => undefined,
     private readonly client = new SNSClient({}),
   ) {}
 
   async notify(notice: CaregiverNotice): Promise<boolean> {
+    const ack = notice.kind === 'call_request' ? this.ackUrl(notice) : undefined;
     await this.client.send(
       new PublishCommand({
         TopicArn: this.topicArn,
         Subject: `Kinwise: ${notice.title}`.slice(0, 99),
-        Message: `${notice.title}\n\n${notice.body}\n\n— Kinwise (signals only: no recordings or transcripts are ever shared)`,
+        Message: [
+          notice.title,
+          notice.body,
+          ...(ack ? [`Tap to tell them you are calling: ${ack}`] : []),
+          '— Kinwise (signals only: no recordings or transcripts are ever shared)',
+        ].join('\n\n'),
         MessageAttributes: {
           kind: { DataType: 'String', StringValue: notice.kind },
           householdId: { DataType: 'String', StringValue: notice.householdId },

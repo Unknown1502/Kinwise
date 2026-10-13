@@ -46,14 +46,40 @@ Context options: `authDomainPrefix`, `callbackUrls`, `allowedOrigins`, `caregive
 
 ## After deploying
 
-### WhatsApp for the caregiver (no app to install)
+### Telling the caregiver: what works today
+
+When Asha presses **Call Meera**, the hub tries every channel that is set up and reports back to the TV whether a real one accepted the
+notice. If none did, the TV says "We couldn't reach Meera" instead of promising a call.
+
+| Channel | Status | What it needs |
+|---|---|---|
+| **E-mail** (SNS) | works, used for the demo | subscribe an address once (below) |
+| Phone push (ntfy) | works | the free ntfy app and the topic below |
+| WhatsApp (Twilio) | built, **blocked on a Twilio trial account** | a paid Twilio account, or a rewrite for Meta's Cloud API ([friction log #15](../docs/friction-log.md)) |
+| SMS | not built | |
+
+Every message carries only the title and body of the notice, and a call request carries a signed link that expires after an hour.
+Opening it shows one button; pressing **I'm calling now** puts a note from Meera on Asha's TV. "Delivered" means a channel accepted the
+message, not that a person read it. Not built: re-sending after a few minutes, a second caregiver, escalation.
+
+#### E-mail (the demo route)
+
+```bash
+# subscribe once; AWS sends a confirmation e-mail, click "Confirm subscription"
+aws sns subscribe --region us-east-1 --protocol email --notification-endpoint you@example.com   --topic-arn $(aws cloudformation describe-stack-resources --stack-name Kinwise --region us-east-1       --query "StackResources[?ResourceType=='AWS::SNS::Topic'].PhysicalResourceId" --output text)
+```
+
+Or deploy with `-c caregiverEmail=you@example.com` (then pass it on every later deploy, or CloudFormation removes the subscription).
+Check the spam folder for the confirmation. The e-mail comes from AWS Notifications and has an unsubscribe link at the bottom.
+
+### WhatsApp for the caregiver (Twilio sandbox: blocked on a trial account)
 
 The hub can message the caregiver on WhatsApp through [Twilio's WhatsApp sandbox](https://www.twilio.com/docs/whatsapp/sandbox).
 The message carries the "Tap to tell them you are calling" link; opening it shows one button.
 
 1. Make a free Twilio account. In the console open **Messaging, Try it out, Send a WhatsApp message**.
 2. From the caregiver's WhatsApp, send the sandbox number the **`join <two words>`** message the console shows.
-3. Put your credentials into the secret (run it yourself; it keeps the token out of chat and shell history files if you use a file):
+3. Put your credentials into the secret (run it yourself, from a file so the shell cannot mangle the quotes; a stray quote once left the token's closing quote out and the hub reported the secret as not filled in):
    ```bash
    aws secretsmanager put-secret-value --region us-east-1 --secret-id <WhatsAppTwilio secret ARN> --secret-string      '{"accountSid":"AC...","authToken":"...","from":"whatsapp:+14155238886","to":"whatsapp:+91XXXXXXXXXX"}'
    ```
@@ -62,7 +88,7 @@ The message carries the "Tap to tell them you are calling" link; opening it show
    ```bash
    aws lambda update-function-configuration --region us-east-1 --function-name <hub function name> --description "reload secrets"
    ```
-4. Press **Call Meera**. If Twilio answers with error **63016**, the sandbox 24-hour window has closed: send `join ...` again.
+4. Press **Call Meera**. **On a Twilio trial account this fails with error 21654 ("ContentSid Required")**, and creating the required template is refused (20003). A paid account is needed; this path is not verified end to end. If Twilio answers with error **63016**, the sandbox 24-hour window has closed: send `join ...` again.
 
 What leaves the hub: the notice title and body, the signed link and the caregiver's number (to Twilio and Meta). Nothing from
 recordings, transcripts or reminders. A production setup would use a Meta-approved message template instead of free text.

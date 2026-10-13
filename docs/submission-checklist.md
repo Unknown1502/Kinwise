@@ -17,6 +17,7 @@ Every rule requirement, the evidence in this repo, and its status. ✅ done · �
 | Alexa+ | Simulated experience: source in repo and clearly shown as simulated | `packages/echo-sim` with a persistent "Simulated Alexa+ surface" label | ✅ |
 | Alexa+ | Hosted endpoint live through Nov 20 | AWS stack `Kinwise` (us-east-1); keep it deployed and keep credits funded | ✅ ⬜ (keep alive) |
 | Ring | Ring API/SDK/simulator imported and actually called at runtime | `agents/ring-worker` (official Partner API); verified on the Developer Playground 2026-10-06 | ✅ |
+| Caregiver notification | Real delivery when Asha presses Call Meera | E-mail through SNS, with a signed one-tap "I'm calling now" link that puts a note from Meera on the TV; an honest "couldn't reach Meera" screen when no real channel accepted it. ntfy phone push and a WhatsApp sender are built but need an app install or a paid Twilio account (friction log #15). Not built: re-send, escalation, a second caregiver, SMS. "Delivered" means a channel accepted it, not that a person read it | ✅ e-mail, ⚠️ the rest |
 | Ring | "Person at the door" on real Ring video | The Playground has only Package, Vehicle and Motion scenes and no way to pick one through the API (friction log #13); every real frame shows the Package clip with no person, and Kinwise correctly stays quiet. The Pause is shown from the labelled doorbell simulator through the same hub rules | ⚠️ real Ring proof is the empty-doorstep case; person case is simulated |
 | Fire TV | App runs on Vega OS (simulator acceptable) | `packages/tv-app` built with Vega SDK 0.24.12112; runs on the Vega Virtual Device, showing the Pause driven by the hosted hub (2026-10-07) | ✅ |
 
@@ -36,7 +37,7 @@ Every rule requirement, the evidence in this repo, and its status. ✅ done · �
 | Screenshots / gallery images | Echo Show cards, Fire TV Pause, Today board, family timeline, architecture diagram | ⬜ |
 | Devpost text (inspiration, what it does, how we built it, challenges, accomplishments, learnings, what's next) | Written by the team in their own words | ⬜ |
 | Product Feedback for every tool used | Source notes: `docs/product-feedback-notes.md` (Alexa+, Ring, Fire TV/Vega, AWS) | ⬜ |
-| Friction Log (up to +10%) | `docs/friction-log.md`, 14 first-hand entries | ✅ (attach/link) |
+| Friction Log (up to +10%) | `docs/friction-log.md`, 15 first-hand entries | ✅ (attach/link) |
 | Testing instructions for judges | Hosted endpoints + demo tokens (`node scripts/demo-tokens.mjs`) go in the private testing field, never the repo | ⬜ |
 | Select tracks: Fire TV, Alexa+, Ring + both mini-challenges | Devpost form | ⬜ |
 | Submit a draft early (Oct 22), final by Oct 23 9:00 AM PT | Devpost | ⬜ |

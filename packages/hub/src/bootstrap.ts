@@ -46,11 +46,11 @@ export async function bootstrap(input: HubConfig, inject: { speech?: SpeechSynth
 
   const outbox = new OutboxNotifier();
   const channels: Notifier[] = [outbox];
-  if (config.snsTopicArn) channels.push(new SnsNotifier(config.snsTopicArn));
   const ackKeyValue = ackKey(config.ingestSecret);
   // Without a public address a message still goes out, just without the confirm link.
   const ackUrl = (n: { callId?: string; householdId: string }) =>
     n.callId && config.publicBaseUrl ? `${config.publicBaseUrl}/ack/${signAck(ackKeyValue, { householdId: n.householdId, callId: n.callId }, Date.now())}` : undefined;
+  if (config.snsTopicArn) channels.push(new SnsNotifier(config.snsTopicArn, ackUrl));
   if (config.ntfy?.topic) {
     channels.push(new NtfyNotifier({ server: config.ntfy.server, topic: config.ntfy.topic, fetch: inject.fetch, ackUrl }));
   }
