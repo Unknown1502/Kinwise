@@ -11,6 +11,7 @@ import {
   type Consent,
   type ExpectedVisit,
   type HouseholdState,
+  type StoredNotice,
   type Recurrence,
   type RiskLevel,
   type SignalCategory,
@@ -194,6 +195,7 @@ export class KinwiseService {
       const expected = state.version;
       const pending: Pending = { notices: [] };
       const result = fn(state, now, pending);
+      if (pending.notices.length) state.notices = [...[...pending.notices].reverse(), ...(state.notices ?? [])];
       capArrays(state);
       state.version = expected + 1;
       try {
@@ -699,6 +701,11 @@ export class KinwiseService {
     });
   }
 
+  /** What the caregiver was told, newest first (the demo phone panel). No access logging: it is not a family look at Asha's day. */
+  async recentNotices(householdId: string): Promise<StoredNotice[]> {
+    return (await this.read(householdId)).state.notices ?? [];
+  }
+
   async tvState(actor: Identity): Promise<TvStateView> {
     this.requireResident(actor);
     let { state, now } = await this.read(actor.householdId);
@@ -825,4 +832,5 @@ function capArrays(s: HouseholdState): void {
   s.accessLog.splice(CAPS.accessLog);
   s.timeline.splice(CAPS.timeline);
   s.processedEventIds.splice(CAPS.processedEventIds);
+  s.notices?.splice(CAPS.notices);
 }

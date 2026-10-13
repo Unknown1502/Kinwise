@@ -296,7 +296,7 @@ export function createApp(deps: AppDeps): Hono<Env> {
         await next();
       });
     }
-    app.get('/dev/notices', (c) => c.json({ notices: deps.outbox?.outbox ?? [] }));
+    app.get('/dev/notices', async (c) => c.json({ notices: await service.recentNotices(config.demoHouseholdId) }));
     app.post('/dev/reset', async (c) => {
       await deps.resetDemo?.();
       deps.outbox?.outbox.splice(0);

@@ -192,6 +192,18 @@ export interface CallRequest {
   ackedAt?: string;
 }
 
+/** What a caregiver was told (a signal, never content). Kept with the household so every server instance shows the same "phone". */
+export interface StoredNotice {
+  householdId: string;
+  caregiverId: string;
+  caregiverName: string;
+  kind: 'pause' | 'call_request' | 'risk_high';
+  title: string;
+  body: string;
+  at: string;
+  callId?: string;
+}
+
 export interface HouseholdState {
   version: number;
   household: Household;
@@ -210,6 +222,8 @@ export interface HouseholdState {
   ignoredDoorEvents: number;
   tvCue?: TvCue;
   callRequest?: CallRequest;
+  /** Newest first, at most CAPS.notices. */
+  notices?: StoredNotice[];
 }
 
 export const CAPS = {
@@ -221,4 +235,5 @@ export const CAPS = {
   accessLog: 200,
   timeline: 300,
   processedEventIds: 500,
+  notices: 30,
 } as const;

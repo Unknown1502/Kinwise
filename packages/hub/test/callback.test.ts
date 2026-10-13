@@ -381,3 +381,30 @@ describe('the demo doorbell is always a stranger', () => {
     void service;
   });
 });
+
+describe('what the caregiver was told is kept with the household, not in one server memory', () => {
+  it('lists notices newest first from stored state, so any server instance shows the same phone', async () => {
+    const ctx = setup('works');
+    await pressCall(ctx);
+    ctx.clock.t = new Date(ctx.clock.t.getTime() + 2.5 * 60_000);
+    await ctx.service.tvState(tv); // the second message
+    const notices = await ctx.service.recentNotices(HH);
+    expect(notices.map((n) => n.kind)).toEqual(['call_request', 'call_request']);
+    expect(notices[0]!.title).toMatch(/still waiting/i);
+    expect(notices[0]!.callId).toBe(notices[1]!.callId);
+    ctx.restore();
+  });
+
+  it('keeps only the latest thirty, and nothing but signals', async () => {
+    const ctx = setup('works');
+    await ctx.service.createHousehold(demoHousehold(ctx.clock.now()));
+    for (let i = 0; i < 40; i++) {
+      ctx.clock.t = new Date(ctx.clock.t.getTime() + 31 * 60_000);
+      await ctx.service.ingestVisitor(HH, { ...stranger(), eventId: `e${i}` });
+    }
+    const notices = await ctx.service.recentNotices(HH);
+    expect(notices.length).toBeLessThanOrEqual(30);
+    for (const n of notices) expect(Object.keys(n).sort()).toEqual(['at', 'body', 'callId', 'caregiverId', 'caregiverName', 'householdId', 'kind', 'title'].filter((k) => k in n).sort());
+    ctx.restore();
+  });
+});
