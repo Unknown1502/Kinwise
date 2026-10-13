@@ -181,6 +181,13 @@ export interface TvCue {
   at: string;
 }
 
+/** The latest "Call Meera" request: which notice to confirm, and whether Meera has said she is calling. */
+export interface CallRequest {
+  id: string;
+  requestedAt: string;
+  ackedAt?: string;
+}
+
 export interface HouseholdState {
   version: number;
   household: Household;
@@ -198,6 +205,7 @@ export interface HouseholdState {
   processedEventIds: string[];
   ignoredDoorEvents: number;
   tvCue?: TvCue;
+  callRequest?: CallRequest;
 }
 
 export const CAPS = {

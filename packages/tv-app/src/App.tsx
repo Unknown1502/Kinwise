@@ -10,11 +10,11 @@ import {asset} from './components/asset';
 import {getConfig} from './config';
 import {useHubState} from './hooks/useHubState';
 import {useBack} from './input/backBus';
-import {callingLine, narration} from './logic/narration';
+import {callFailedLine, callingLine, narration} from './logic/narration';
 import {selectScreen} from './logic/selectScreen';
 import {ExpectedToast} from './overlays/ExpectedToast';
 import {GentleOverlay} from './overlays/GentleOverlay';
-import {CALLING_CONFIRMATION_MS, CallingScreen} from './screens/CallingScreen';
+import {CALLING_CONFIRMATION_MS, CALLING_FAILED_MS, CallingScreen} from './screens/CallingScreen';
 import {HomeScreen} from './screens/HomeScreen';
 import {LoadingScreen} from './screens/LoadingScreen';
 import {OnboardingScreen, type ConsentDraft} from './screens/OnboardingScreen';
@@ -65,7 +65,7 @@ export function App({client: injected}: AppProps = {}) {
   const {refresh, patch} = hub;
   const [route, setRoute] = useState<Route>('home');
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
-  const [calling, setCalling] = useState<string | null>(null);
+  const [calling, setCalling] = useState<{name: string; delivered: boolean} | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [pauseError, setPauseError] = useState<string | undefined>();
@@ -77,7 +77,7 @@ export function App({client: injected}: AppProps = {}) {
 
   useEffect(() => {
     if (!calling) return;
-    const t = setTimeout(() => setCalling(null), CALLING_CONFIRMATION_MS);
+    const t = setTimeout(() => setCalling(null), calling.delivered ? CALLING_CONFIRMATION_MS : CALLING_FAILED_MS);
     return () => clearTimeout(t);
   }, [calling]);
 
@@ -158,8 +158,10 @@ export function App({client: injected}: AppProps = {}) {
           const res = await client.respondToAlert(target.id, action);
           hide(target.id);
           if (action === 'call_family') {
-            setCalling(target.caregiverName);
-            voice.speakNow([callingLine(target.caregiverName)]);
+            // `delivered` is absent from an older hub, which could not tell: keep the old, hopeful wording.
+            const delivered = res.delivered !== false;
+            setCalling({name: target.caregiverName, delivered});
+            voice.speakNow([delivered ? callingLine(target.caregiverName) : callFailedLine(target.caregiverName)]);
           } else {
             say(res.message);
           }
@@ -279,7 +281,7 @@ export function App({client: injected}: AppProps = {}) {
   if (!state || !selection) {
     base = <LoadingScreen hubUrl={client.baseUrl} error={hub.error} />;
   } else if (calling) {
-    base = <CallingScreen name={calling} />;
+    base = <CallingScreen name={calling.name} delivered={calling.delivered} />;
   } else if (showPause && alert) {
     base = (
       <PauseScreen

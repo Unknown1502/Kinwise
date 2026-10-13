@@ -70,6 +70,8 @@ export interface Notice {
   title: string;
   body: string;
   at: string;
+  /** On a call request: the call Meera's "I'm calling now" button confirms. */
+  callId?: string;
 }
 
 export type NoticesOutcome = { status: 'ok'; notices: Notice[] } | { status: 'unavailable' } | { status: 'offline' };
@@ -88,6 +90,7 @@ export function parseNotices(body: unknown): Notice[] {
       title: r.title,
       body: typeof r.body === 'string' ? r.body : '',
       at: r.at,
+      ...(typeof r.callId === 'string' ? { callId: r.callId } : {}),
     });
   }
   return out;
@@ -189,5 +192,17 @@ export async function requestSpeech(
     return typeof body?.url === 'string' ? { url: body.url, voice: typeof body.voice === 'string' ? body.voice : 'natural' } : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/** Meera, signed in, says she is calling: Asha's TV then shows a note from her. */
+export async function confirmCall(hubUrl: string, callId: string, fetchImpl: FetchImpl = defaultFetch, token?: string): Promise<DevOutcome<{ ok: boolean }>> {
+  try {
+    const res = await fetchImpl(`${hubUrl}/caregiver/calls/${encodeURIComponent(callId)}/ack`, { method: 'POST', headers: bearer(token) });
+    if (res.status === 404) return { ok: false, message: 'That call request is no longer there.' };
+    if (!res.ok) return { ok: false, message: `Could not confirm (HTTP ${res.status}).` };
+    return { ok: true, data: { ok: true } };
+  } catch {
+    return { ok: false, message: `Can't reach the hub at ${hubUrl}.` };
   }
 }

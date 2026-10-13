@@ -19,6 +19,8 @@ export interface HubConfig {
   tableName?: string;
   dataFile: string;
   snsTopicArn?: string;
+  /** Phone push to the caregiver through ntfy. The topic is the secret that routes the push, so it must be long. */
+  ntfy?: { server: string; topic?: string; /** Secrets Manager ARN holding the topic (resolved at cold start). */ topicSecretArn?: string };
   allowedOrigins: string[];
   wwwAuthenticate: boolean;
   conciergeUrl?: string;
@@ -77,6 +79,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
     tableName: env.TABLE_NAME,
     dataFile: env.DATA_FILE ?? '.kinwise-data/state.json',
     snsTopicArn: env.SNS_TOPIC_ARN,
+    ntfy: loadNtfy(env),
     allowedOrigins: (env.ALLOWED_ORIGINS ?? 'http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174')
       .split(',')
       .map((s) => s.trim())
@@ -96,6 +99,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
       region,
     },
   };
+}
+
+/** On the public ntfy.sh anyone who knows the topic can read it, so a guessable one is refused. */
+export function checkNtfyTopic(topic: string): string {
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(topic)) throw new Error('NTFY_TOPIC must be 16-64 letters, digits, - or _ (it acts as a password)');
+  return topic;
+}
+
+function loadNtfy(env: NodeJS.ProcessEnv): HubConfig['ntfy'] {
+  const topic = env.NTFY_TOPIC || undefined;
+  const topicSecretArn = env.NTFY_TOPIC_SECRET_ARN || undefined;
+  if (!topic && !topicSecretArn) return undefined;
+  const server = (env.NTFY_SERVER ?? 'https://ntfy.sh').replace(/\/$/, '');
+  if (!server.startsWith('https://')) throw new Error('NTFY_SERVER must be an https:// URL');
+  return { server, ...(topic ? { topic: checkNtfyTopic(topic) } : {}), ...(topicSecretArn ? { topicSecretArn } : {}) };
 }
 
 function required(env: NodeJS.ProcessEnv, key: string): string {

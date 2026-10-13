@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { askConcierge, describeDecision, fetchNotices, parseNotices, resetDemo, ringDoorbell } from './hubApi';
+import { askConcierge, confirmCall, describeDecision, fetchNotices, parseNotices, resetDemo, ringDoorbell } from './hubApi';
 
 const json = (status: number, body: unknown) => async () =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -101,5 +101,23 @@ describe('doorbell', () => {
     const out = await ringDoorbell('http://hub', { personPresent: true }, json(200, { duplicate: false, decision: 'pause', alertId: 'a1' }));
     expect(out).toEqual({ ok: true, data: { duplicate: false, decision: 'pause', alertId: 'a1' } });
     if (out.ok) expect(describeDecision(out.data)).toMatch(/Pause/);
+  });
+});
+
+describe('confirmCall (Meera confirms she is calling)', () => {
+  it('posts to the caregiver route with her login', async () => {
+    const seen: Array<[string, RequestInit | undefined]> = [];
+    const out = await confirmCall('http://hub', 'call 1', async (url, init) => {
+      seen.push([String(url), init]);
+      return new Response('{}', { status: 200 });
+    }, 'tok');
+    expect(out.ok).toBe(true);
+    expect(seen[0]![0]).toBe('http://hub/caregiver/calls/call%201/ack');
+    expect(seen[0]![1]).toMatchObject({ method: 'POST', headers: { authorization: 'Bearer tok' } });
+  });
+
+  it('says why when it did not work', async () => {
+    expect(await confirmCall('http://hub', 'c', async () => new Response('{}', { status: 404 }))).toMatchObject({ ok: false, message: expect.stringMatching(/no longer/) });
+    expect(await confirmCall('http://hub', 'c', async () => { throw new Error('x'); })).toMatchObject({ ok: false });
   });
 });

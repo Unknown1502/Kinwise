@@ -1,0 +1,142 @@
+import { describe, expect, it } from 'vitest';
+import { loadConfig } from '../src/config.js';
+import { ackKey, signAck, verifyAck } from '../src/services/ackLink.js';
+import { MultiNotifier, NtfyNotifier, OutboxNotifier, type CaregiverNotice, type Notifier } from '../src/services/notifier.js';
+
+const notice = (over: Partial<CaregiverNotice> = {}): CaregiverNotice => ({
+  householdId: 'hh-asha',
+  caregiverId: 'priya',
+  caregiverName: 'Meera',
+  kind: 'call_request',
+  title: 'Asha wants to talk to you now',
+  body: 'Asha chose "Call Meera" on the TV during a Kinwise Pause. Please call now.',
+  at: '2026-10-13T14:00:00.000Z',
+  callId: 'call_1',
+  ...over,
+});
+
+type Sent = { url: string; body: Record<string, unknown>; headers: Record<string, string> };
+function fakeFetch(status = 200) {
+  const sent: Sent[] = [];
+  const fetch = (async (url: string, init: { body: string; headers: Record<string, string> }) => {
+    sent.push({ url, body: JSON.parse(init.body), headers: init.headers });
+    return new Response('{}', { status });
+  }) as unknown as typeof globalThis.fetch;
+  return { sent, fetch };
+}
+
+describe('NtfyNotifier (phone push)', () => {
+  const topic = 'kw-test-topic-0123456789';
+
+  it('sends an urgent push with a tap-to-confirm button, and nothing but the signal', async () => {
+    const { sent, fetch } = fakeFetch();
+    const ntfy = new NtfyNotifier({ server: 'https://ntfy.example', topic, ackUrl: (n) => `https://hub.example/ack/${n.callId}`, fetch });
+    expect(await ntfy.notify(notice())).toBe(true);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.url).toBe('https://ntfy.example');
+    expect(sent[0]!.body).toMatchObject({
+      topic,
+      title: 'Asha wants to talk to you now',
+      priority: 5,
+      actions: [{ action: 'http', label: "I'm calling now", url: 'https://hub.example/ack/call_1', method: 'POST' }],
+    });
+    expect(String(sent[0]!.body.message)).toContain('Please call now');
+  });
+
+  it('is high priority, not urgent, for a Pause or a warning, and has no button without a call to confirm', async () => {
+    const { sent, fetch } = fakeFetch();
+    const ntfy = new NtfyNotifier({ server: 'https://ntfy.example', topic, ackUrl: () => undefined, fetch });
+    await ntfy.notify(notice({ kind: 'pause', callId: undefined }));
+    await ntfy.notify(notice({ kind: 'risk_high', callId: undefined }));
+    expect(sent.map((s) => s.body.priority)).toEqual([4, 4]);
+    expect(sent.every((s) => s.body.actions === undefined)).toBe(true);
+  });
+
+  it('reports failure (false) when the push service refuses or is unreachable', async () => {
+    const refused = new NtfyNotifier({ server: 'https://ntfy.example', topic, ackUrl: () => undefined, fetch: fakeFetch(429).fetch });
+    expect(await refused.notify(notice())).toBe(false);
+    const down = new NtfyNotifier({
+      server: 'https://ntfy.example',
+      topic,
+      ackUrl: () => undefined,
+      fetch: (async () => {
+        throw new Error('network down');
+      }) as unknown as typeof globalThis.fetch,
+    });
+    expect(await down.notify(notice())).toBe(false);
+  });
+});
+
+describe('MultiNotifier: "delivered" means a real channel got it', () => {
+  const ok: Notifier = { notify: async () => true };
+  const no: Notifier = { notify: async () => false };
+  const boom: Notifier = {
+    notify: async () => {
+      throw new Error('boom');
+    },
+  };
+  const quiet = new OutboxNotifier(() => {});
+  const silenced = () => {
+    const orig = console.error;
+    console.error = () => {};
+    return () => (console.error = orig);
+  };
+
+  it('is delivered when any real channel succeeds, even if another fails', async () => {
+    const restore = silenced();
+    expect(await new MultiNotifier([quiet, boom, ok]).notify(notice())).toBe(true);
+    restore();
+  });
+
+  it('is NOT delivered when only the simulated phone got it but a real channel failed', async () => {
+    const restore = silenced();
+    expect(await new MultiNotifier([quiet, no]).notify(notice())).toBe(false);
+    expect(await new MultiNotifier([quiet, boom]).notify(notice())).toBe(false);
+    restore();
+  });
+
+  it('counts the simulated phone only when it is the only channel (the local demo)', async () => {
+    expect(await new MultiNotifier([quiet]).notify(notice())).toBe(true);
+  });
+});
+
+describe('signed confirm links', () => {
+  const key = ackKey('test-secret');
+  const now = Date.parse('2026-10-13T14:00:00Z');
+
+  it('round-trips household and call, and expires', () => {
+    const token = signAck(key, { householdId: 'hh-asha', callId: 'call_1' }, now);
+    expect(verifyAck(key, token, now + 60_000)).toEqual({ householdId: 'hh-asha', callId: 'call_1' });
+    expect(verifyAck(key, token, now + 61 * 60_000)).toBeUndefined();
+  });
+
+  it('rejects a link signed with another key, edited, or cut short', () => {
+    const token = signAck(key, { householdId: 'hh-asha', callId: 'call_1' }, now);
+    const [payload, sig] = token.split('.');
+    const forged = Buffer.from(JSON.stringify({ h: 'hh-other', k: 'call_1', e: now / 1000 + 600 })).toString('base64url');
+    expect(verifyAck(ackKey('other'), token, now)).toBeUndefined();
+    expect(verifyAck(key, `${forged}.${sig}`, now)).toBeUndefined();
+    expect(verifyAck(key, payload!, now)).toBeUndefined();
+    expect(verifyAck(key, `${token}.x`, now)).toBeUndefined();
+  });
+
+  it('is not interchangeable with a speech link', async () => {
+    const { speechKey, signSpeech } = await import('../src/speech/speech.js');
+    expect(verifyAck(ackKey('s'), signSpeech(speechKey('s'), 'hi', now), now)).toBeUndefined();
+  });
+});
+
+describe('config: NTFY_TOPIC is a password', () => {
+  const env = (extra: Record<string, string>) => ({ AUTH_MODE: 'dev', STORE: 'memory', ...extra }) as NodeJS.ProcessEnv;
+
+  it('is off by default and read from the environment', () => {
+    expect(loadConfig(env({})).ntfy).toBeUndefined();
+    expect(loadConfig(env({ NTFY_TOPIC: 'kw-a1b2c3d4e5f6a7b8' })).ntfy).toEqual({ server: 'https://ntfy.sh', topic: 'kw-a1b2c3d4e5f6a7b8' });
+    expect(loadConfig(env({ NTFY_TOPIC: 'kw-a1b2c3d4e5f6a7b8', NTFY_SERVER: 'https://push.example.org/' })).ntfy?.server).toBe('https://push.example.org');
+  });
+
+  it('refuses a guessable topic or a non-https server', () => {
+    expect(() => loadConfig(env({ NTFY_TOPIC: 'meera' }))).toThrow(/NTFY_TOPIC/);
+    expect(() => loadConfig(env({ NTFY_TOPIC: 'kw-a1b2c3d4e5f6a7b8', NTFY_SERVER: 'http://push.example.org' }))).toThrow(/NTFY_SERVER/);
+  });
+});

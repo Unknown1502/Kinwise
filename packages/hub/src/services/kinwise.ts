@@ -110,6 +110,9 @@ interface Pending {
   notices: CaregiverNotice[];
 }
 
+/** How long after pressing "Call Meera" her "I'm calling now" button still works. */
+const CALL_CONFIRM_MS = 60 * 60_000;
+
 export function adviceFor(level: RiskLevel, categories: readonly SignalCategory[], caregiverName: string): string[] {
   const advice =
     level === 'high'
@@ -167,6 +170,14 @@ export class KinwiseService {
 
   /** Load → mutate draft → cap → save with optimistic concurrency; notices are sent only after a successful save. */
   private async mutate<T>(householdId: string, fn: (s: HouseholdState, now: Date, p: Pending) => T): Promise<T> {
+    return (await this.mutateNotifying(householdId, fn)).result;
+  }
+
+  /** Like `mutate`, and also says whether every notice reached the caregiver (true when there was nothing to send). */
+  private async mutateNotifying<T>(
+    householdId: string,
+    fn: (s: HouseholdState, now: Date, p: Pending) => T,
+  ): Promise<{ result: T; delivered: boolean }> {
     for (let attempt = 0; ; attempt++) {
       const { state, now } = await this.read(householdId);
       const expected = state.version;
@@ -180,8 +191,9 @@ export class KinwiseService {
         if (err instanceof ConflictError && attempt < 4) continue;
         throw err;
       }
-      for (const n of pending.notices) await this.notifier.notify(n);
-      return result;
+      let delivered = true;
+      for (const n of pending.notices) delivered = (await this.notifier.notify(n)) && delivered;
+      return { result, delivered };
     }
   }
 
@@ -456,9 +468,9 @@ export class KinwiseService {
 
   // ───────────────────────────── alerts ─────────────────────────────
 
-  async respondToAlert(actor: Identity, alertId: string, action: AlertAction): Promise<{ alert: AlertView; message: string }> {
+  async respondToAlert(actor: Identity, alertId: string, action: AlertAction): Promise<{ alert: AlertView; message: string; delivered?: boolean }> {
     this.requireResident(actor);
-    return this.mutate(actor.householdId, (s, now, pending) => {
+    const { result, delivered } = await this.mutateNotifying(actor.householdId, (s, now, pending) => {
       const alert = s.alerts.find((a) => a.id === alertId);
       if (!alert) throw new NotFoundError('No such alert');
       if (alert.status !== 'active') throw new ValidationError('That alert is no longer active');
@@ -474,6 +486,8 @@ export class KinwiseService {
         addTimeline(s, now, 'alert_resolved', `${residentName} chose "Call ${caregiverName}".`);
         // The TV acts through its device identity; voice requests come from the resident on the Echo.
         const surface = actor.role === 'device' ? 'the TV' : 'the Echo Show';
+        const callId = this.ids('call');
+        s.callRequest = { id: callId, requestedAt: now.toISOString() };
         for (const c of caregivers(s)) {
           pending.notices.push({
             householdId: s.household.id,
@@ -483,6 +497,7 @@ export class KinwiseService {
             title: `${residentName} wants to talk to you now`,
             body: `${residentName} chose "Call ${c.name}" on ${surface} during a Kinwise Pause. Please call now.`,
             at: now.toISOString(),
+            callId,
           });
         }
       } else if (action === 'known_person') {
@@ -492,7 +507,36 @@ export class KinwiseService {
         message = 'Okay, I closed the alert.';
         addTimeline(s, now, 'alert_resolved', `${residentName} dismissed the alert.`);
       }
-      return { alert: alertView(s, alert, { forResident: true }), message };
+      return { alert: alertView(s, alert, { forResident: true }), message, caregiverName };
+    });
+    const { caregiverName, ...view } = result;
+    if (action !== 'call_family') return view;
+    if (delivered) return { ...view, delivered };
+    // Do not let the TV promise a call nobody was told about.
+    return { ...view, message: `I couldn't reach ${caregiverName}. Please try calling ${caregiverName} yourself.`, delivered };
+  }
+
+  /** The caregiver, signed in, says she is calling. */
+  async acknowledgeCall(actor: Identity, callId: string): Promise<void> {
+    if (actor.role !== 'caregiver') throw new PermissionError('Only family members can confirm a call');
+    await this.confirmCall(actor.householdId, callId);
+  }
+
+  /** The caregiver pressed the button in her phone notification: the signed link already proved which call it is. */
+  async acknowledgeCallByLink(householdId: string, callId: string): Promise<void> {
+    await this.confirmCall(householdId, callId);
+  }
+
+  private async confirmCall(householdId: string, callId: string): Promise<void> {
+    await this.mutate(householdId, (s, now) => {
+      const call = s.callRequest;
+      if (!call || call.id !== callId) throw new NotFoundError('No such call request');
+      if (call.ackedAt) return; // pressed twice: nothing more to say
+      if (now.getTime() - Date.parse(call.requestedAt) > CALL_CONFIRM_MS) throw new ValidationError('This call request has expired');
+      call.ackedAt = now.toISOString();
+      const name = primaryCaregiverName(s);
+      s.messages.unshift({ id: this.ids('msg'), from: name, text: "I got your request and I'm calling you now.", at: now.toISOString() });
+      addTimeline(s, now, 'alert_resolved', `${name} confirmed they are calling ${resident(s).name}.`);
     });
   }
 

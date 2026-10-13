@@ -1005,6 +1005,37 @@ button:disabled {
   line-height: 1.35;
 }
 
+.notice-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.notice-button {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffd166;
+  color: #0b2230;
+  cursor: pointer;
+}
+.notice-button:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+.notice-done {
+  font-size: 13px;
+  color: #7fddb8;
+}
+.notice-error {
+  font-size: 13px;
+  color: #ff8a65;
+}
+
 /* ── demo controls ── */
 .demo-controls {
   border: 1px solid var(--line);

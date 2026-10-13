@@ -113,6 +113,8 @@ export interface TvStateView {
 export interface RespondResult {
   alert: AlertView;
   message: string;
+  /** Set for "Call": whether the family member was really notified (absent from an older hub). */
+  delivered?: boolean;
 }
 
 export interface PrivacyHourResult {

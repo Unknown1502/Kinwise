@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNotices } from '../hooks';
 import { clockTime } from '../lib/format';
-import { noticeKey, type Notice } from '../lib/hubApi';
+import { confirmCall, noticeKey, type Notice } from '../lib/hubApi';
 
 const KIND_ICON: Record<string, string> = { pause: '⏸', call_request: '📞', risk_high: '!' };
 const KIND_LABEL: Record<string, string> = { pause: 'Pause shown', call_request: 'Call request', risk_high: 'Warning signs' };
@@ -9,6 +9,11 @@ const KIND_LABEL: Record<string, string> = { pause: 'Pause shown', call_request:
 /** "Meera's phone": the caregiver's notifications (polls the hub's dev outbox). */
 export function PhonePanel({ hubUrl, token }: { hubUrl: string; token?: string }) {
   const state = useNotices(hubUrl, token, 2000);
+  const [confirmed, setConfirmed] = useState<Record<string, 'done' | string>>({});
+  const confirm = async (callId: string) => {
+    const out = await confirmCall(hubUrl, callId, undefined, token);
+    setConfirmed((c) => ({ ...c, [callId]: out.ok ? 'done' : out.message }));
+  };
   if (state?.status === 'unavailable') return null; // dev route absent → hide
   const notices: Notice[] = state?.status === 'ok' ? state.notices : [];
   return (
@@ -38,6 +43,18 @@ export function PhonePanel({ hubUrl, token }: { hubUrl: string; token?: string }
               </div>
               <p className="notice-title">{n.title}</p>
               {n.body && <p className="notice-body">{n.body}</p>}
+              {n.callId && (
+                <div className="notice-actions">
+                  {confirmed[n.callId] === 'done' ? (
+                    <span className="notice-done">✓ Asha's TV now says you're calling</span>
+                  ) : (
+                    <button type="button" className="notice-button" onClick={() => void confirm(n.callId!)}>
+                      I'm calling now
+                    </button>
+                  )}
+                  {confirmed[n.callId] && confirmed[n.callId] !== 'done' && <span className="notice-error">{confirmed[n.callId]}</span>}
+                </div>
+              )}
             </li>
           ))}
         </ol>

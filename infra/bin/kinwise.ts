@@ -19,6 +19,8 @@ const stack = new KinwiseStack(app, 'Kinwise', {
   callbackUrls: list('callbackUrls', 'http://localhost:5173/callback'),
   allowedOrigins: list('allowedOrigins', 'http://localhost:5173,http://localhost:5174'),
   caregiverEmail: app.node.tryGetContext('caregiverEmail') as string | undefined,
+  phonePush: ctx('phonePush', 'true') === 'true',
+  ntfyServer: ctx('ntfyServer', 'https://ntfy.sh'),
   conciergeModelId: ctx('conciergeModelId', 'us.amazon.nova-2-lite-v1:0'),
   demoTimezone: ctx('demoTimezone', 'America/New_York'),
   devRoutes: ctx('devRoutes', 'true') === 'true',

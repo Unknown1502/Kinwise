@@ -43,5 +43,9 @@ export function alertLine(alert: AlertView, residentName: string): string {
 }
 
 export function callingLine(name: string): string {
-  return `Calling ${name} now. You don't need to open the door.`;
+  return `I've told ${name} to call you. You don't need to open the door.`;
+}
+
+export function callFailedLine(name: string): string {
+  return `I couldn't reach ${name}. Please call ${name} yourself. You don't need to open the door.`;
 }

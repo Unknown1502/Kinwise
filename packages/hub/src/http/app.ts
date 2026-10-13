@@ -8,6 +8,7 @@ import type { HubConfig } from '../config.js';
 import type { AlertAction, Recurrence, VisitorEvent } from '../domain/types.js';
 import { buildMcpServer, SERVER_VERSION } from '../mcp/server.js';
 import { KinwiseService, NotFoundError, ValidationError } from '../services/kinwise.js';
+import { ackKey, verifyAck } from '../services/ackLink.js';
 import { signSpeech, speechKey, speechText, verifySpeech, type SpeechSynth } from '../speech/speech.js';
 import type { OutboxNotifier } from '../services/notifier.js';
 import type { ConciergeClient } from './concierge.js';
@@ -240,6 +241,46 @@ export function createApp(deps: AppDeps): Hono<Env> {
     }
     console.log(JSON.stringify({ msg: 'speech', chars: text.length, bytes: audio.byteLength, voice: deps.speech.voice }));
     return c.body(audio as Uint8Array<ArrayBuffer>, 200, { 'content-type': 'audio/mpeg', 'cache-control': 'private, max-age=900' });
+  });
+
+  // ── "I'm calling now": the caregiver tells the TV she got the request ──
+  const confirmKey = ackKey(config.ingestSecret);
+  const page = (c: Context, status: 200 | 403, heading: string, body: string, form?: string) =>
+    c.html(
+      `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kinwise</title>` +
+        `<body style="font:20px/1.5 system-ui,sans-serif;max-width:30rem;margin:12vh auto;padding:0 1.25rem;color:#0b2230"><h1 style="font-size:1.6rem">${heading}</h1><p>${body}</p>${form ?? ''}</body></html>`,
+      status,
+    );
+
+  // Opening the link only shows a button: mail scanners and link previews open links, and must not confirm a call.
+  app.get('/ack/:token', (c) => {
+    if (!verifyAck(confirmKey, c.req.param('token'), Date.now())) {
+      return page(c, 403, 'This link has expired', 'Open Kinwise or call the person directly.');
+    }
+    return page(
+      c,
+      200,
+      'Let them know you are calling',
+      'Tap the button and their TV will tell them you got the request and are calling now.',
+      `<form method="post" action=""><button style="font:inherit;font-weight:700;padding:.8rem 1.4rem;border:0;border-radius:.7rem;background:#ffd166;color:#0b2230">I'm calling now</button></form>`,
+    );
+  });
+  app.post('/ack/:token', async (c) => {
+    const claim = verifyAck(confirmKey, c.req.param('token'), Date.now());
+    const wantsPage = (c.req.header('content-type') ?? '').includes('application/x-www-form-urlencoded');
+    if (!claim) {
+      if (wantsPage) return page(c, 403, 'This link has expired', 'Open Kinwise or call the person directly.');
+      return c.json({ error: 'invalid_or_expired', error_description: 'This confirm link is invalid or has expired' }, 403);
+    }
+    await service.acknowledgeCallByLink(claim.householdId, claim.callId);
+    return wantsPage ? page(c, 200, 'Done', 'Their TV now says you are calling. Thank you.') : c.json({ ok: true });
+  });
+  // The same confirmation from a signed-in caregiver (the simulator's phone panel, a future app).
+  app.post('/caregiver/calls/:id/ack', async (c) => {
+    const auth = await authenticate(c);
+    if (auth instanceof Response) return auth;
+    await service.acknowledgeCall(auth, c.req.param('id'));
+    return c.json({ ok: true });
   });
 
   // ── Dev-only helpers for the local demo ──

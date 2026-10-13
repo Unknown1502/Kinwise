@@ -26,6 +26,10 @@ export interface KinwiseStackProps extends StackProps {
   allowedOrigins: string[];
   /** Optional e-mail subscribed to caregiver alerts. */
   caregiverEmail?: string;
+  /** Push the caregiver's phone through ntfy (a random topic is generated into Secrets Manager). Default true. */
+  phonePush?: boolean;
+  /** ntfy server, https only. Default https://ntfy.sh. */
+  ntfyServer?: string;
   conciergeModelId: string;
   demoTimezone: string;
   /** Keep the auth-protected demo helpers (/dev/*) enabled for the judges' walkthrough. */
@@ -68,6 +72,16 @@ export class KinwiseStack extends Stack {
       description: 'Seed for hosted-demo persona tokens (print them with scripts/demo-tokens.mjs)',
       generateSecretString: { secretStringTemplate: '{}', generateStringKey: 'seed', passwordLength: 48, excludePunctuation: true },
     });
+
+    // The topic that routes the push to Meera's phone is a password on the public ntfy.sh, so the stack
+    // generates a long random one and keeps it here; read it once to subscribe the phone (see infra/README.md).
+    const ntfyTopic =
+      props.phonePush === false
+        ? undefined
+        : new secrets.Secret(this, 'NtfyTopic', {
+            description: 'ntfy topic that carries caregiver push notifications. Subscribe the caregiver phone to it; treat it like a password.',
+            generateSecretString: { secretStringTemplate: '{}', generateStringKey: 'value', passwordLength: 32, excludePunctuation: true },
+          });
 
     // ── Cognito: Alexa+ two-tier OAuth ──
     const userPool = new cognito.UserPool(this, 'Users', {
@@ -159,6 +173,11 @@ export class KinwiseStack extends Stack {
         POLLY_ENGINE: 'neural',
       },
     });
+    if (ntfyTopic) {
+      hub.addEnvironment('NTFY_TOPIC_SECRET_ARN', ntfyTopic.secretArn);
+      hub.addEnvironment('NTFY_SERVER', props.ntfyServer ?? 'https://ntfy.sh');
+      ntfyTopic.grantRead(hub);
+    }
     table.grantReadWriteData(hub);
     // SynthesizeSpeech has no resource-level permissions, so it can only be granted on "*".
     hub.addToRolePolicy(new iam.PolicyStatement({ actions: ['polly:SynthesizeSpeech'], resources: ['*'] }));
@@ -171,6 +190,8 @@ export class KinwiseStack extends Stack {
       description: 'Kinwise hub (MCP 2025-11-25 Streamable HTTP at /mcp)',
       defaultIntegration: new integrations.HttpLambdaIntegration('HubIntegration', hub),
     });
+    // The "I'm calling now" button in the push links back here, so the hub needs its own address.
+    hub.addEnvironment('PUBLIC_BASE_URL', api.apiEndpoint);
     const stage = api.defaultStage?.node.defaultChild as apigw.CfnStage | undefined;
     if (stage) stage.defaultRouteSettings = { throttlingBurstLimit: 50, throttlingRateLimit: 25 };
 

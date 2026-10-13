@@ -58,6 +58,40 @@ describe('KinwiseStack', () => {
     });
   });
 
+  it('pushes to the caregiver phone: a generated secret topic, the hub reads it, and knows its own address', () => {
+    t.hasResourceProperties('AWS::SecretsManager::Secret', {
+      Description: Match.stringLikeRegexp('ntfy topic'),
+      GenerateSecretString: Match.objectLike({ GenerateStringKey: 'value', PasswordLength: 32, ExcludePunctuation: true }),
+    });
+    t.hasResourceProperties('AWS::Lambda::Function', {
+      Environment: {
+        Variables: Match.objectLike({ NTFY_TOPIC_SECRET_ARN: Match.anyValue(), NTFY_SERVER: 'https://ntfy.sh', PUBLIC_BASE_URL: Match.anyValue() }),
+      },
+    });
+    const fns = Object.values(t.findResources('AWS::Lambda::Function')) as any[];
+    for (const fn of fns) expect(fn.Properties?.Environment?.Variables ?? {}).not.toHaveProperty('NTFY_TOPIC');
+  });
+
+  it('can leave phone push out', () => {
+    const app = new App();
+    const off = Template.fromStack(
+      new KinwiseStack(app, 'NoPush', {
+        env: { account: '123456789012', region: 'us-east-1' },
+        repoRoot,
+        authDomainPrefix: 'kinwise-test',
+        callbackUrls: ['http://localhost:5173/callback'],
+        allowedOrigins: ['http://localhost:5173'],
+        conciergeModelId: 'us.amazon.nova-2-lite-v1:0',
+        demoTimezone: 'America/New_York',
+        devRoutes: true,
+        phonePush: false,
+      }),
+    );
+    for (const fn of Object.values(off.findResources('AWS::Lambda::Function')) as any[]) {
+      expect(fn.Properties?.Environment?.Variables ?? {}).not.toHaveProperty('NTFY_TOPIC_SECRET_ARN');
+    }
+  }, 120_000);
+
   it('implements the Alexa+ two-tier OAuth scopes', () => {
     t.hasResourceProperties('AWS::Cognito::UserPoolResourceServer', {
       Identifier: 'kinwise',

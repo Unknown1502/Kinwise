@@ -1,5 +1,5 @@
 /* What the TV says aloud (jest on the Vega build machine, vitest in packages/tv-preview). */
-import {alertLine, callingLine, narration} from '../src/logic/narration';
+import {alertLine, callFailedLine, callingLine, narration} from '../src/logic/narration';
 import {SIGNS, expectedAlert, gentleAlert, homeState, pauseAlert, withAlert} from './fixtures';
 
 describe('narration', () => {
@@ -55,6 +55,7 @@ describe('narration', () => {
 
   it('words each kind of visitor and the call plainly', () => {
     expect(alertLine(expectedAlert(), 'Asha')).toBe("Luis (gardener) is at the door. They're on today's list.");
-    expect(callingLine('Meera')).toBe("Calling Meera now. You don't need to open the door.");
+    expect(callingLine('Meera')).toBe("I've told Meera to call you. You don't need to open the door.");
+    expect(callFailedLine('Meera')).toBe("I couldn't reach Meera. Please call Meera yourself. You don't need to open the door.");
   });
 });

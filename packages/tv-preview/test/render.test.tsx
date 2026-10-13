@@ -14,7 +14,7 @@ interface Post {
 }
 
 /** An in-memory stand-in for the hub's /tv API, reached through the real HubClient. */
-function fakeHub(initial: TvStateView) {
+function fakeHub(initial: TvStateView, opts: {callDelivered?: boolean} = {}) {
   let state = initial;
   const posts: Post[] = [];
   const json = (body: unknown, status = 200) =>
@@ -34,7 +34,8 @@ function fakeHub(initial: TvStateView) {
           : body.action === 'known_person'
             ? 'Okay. You can add them as an expected visitor so I remember next time.'
             : 'Okay, I closed the alert.';
-      return json({alert, message});
+      const delivered = body.action === 'call_family' ? (opts.callDelivered ?? true) : undefined;
+      return json({alert, message, ...(delivered === undefined ? {} : {delivered})});
     }
     if (path === '/tv/consent') {
       const {onboarded, ...rest} = body;
@@ -223,17 +224,17 @@ describe('the Pause', () => {
     expect(screen.getByText(/Pressure to act fast is the most common scam warning sign/)).toBeTruthy();
   });
 
-  it('Call Meera → responds call_family and confirms "Calling Meera now…"', async () => {
+  it('Call Meera → responds call_family and says Meera is being told', async () => {
     const hub = fakeHub(withAlert(homeState(), pauseAlert()));
     render(<App client={hub.client} />);
     await screen.findByTestId('pause-screen');
     await focusOn('Call Meera');
     press('Enter');
-    expect(await screen.findByText('Calling Meera now…')).toBeTruthy();
+    expect(await screen.findByText('Telling Meera now…')).toBeTruthy();
     expect(hub.posts).toContainEqual({path: '/tv/alerts/alert_pause_1/respond', body: {action: 'call_family'}});
   });
 
-  it('returns home after the 5 s confirmation with a working D-pad focus', async () => {
+  it('returns home after the confirmation with a working D-pad focus', async () => {
     const s = homeState();
     const calm = {...s, today: {...s.today, messages: []}};
     const hub = fakeHub(calm);
@@ -243,8 +244,8 @@ describe('the Pause', () => {
     await screen.findByTestId('pause-screen', undefined, {timeout: 4000});
     await focusOn('Call Meera');
     press('Enter');
-    await screen.findByText('Calling Meera now…');
-    expect(await screen.findByTestId('home-screen', undefined, {timeout: 7000})).toBeTruthy();
+    await screen.findByText('Telling Meera now…');
+    expect(await screen.findByTestId('home-screen', undefined, {timeout: 8000})).toBeTruthy();
     await focusOn('Settings & privacy');
     press('Enter');
     expect(await screen.findByTestId('settings-screen')).toBeTruthy();
@@ -319,14 +320,31 @@ describe('the TV talks', () => {
     );
   });
 
+  it("says so, aloud and on screen, when Meera could not be reached, and stays long enough to read", async () => {
+    const hub = fakeHub(withAlert(homeState(), pauseAlert()), {callDelivered: false});
+    render(<App client={hub.client} />);
+    await screen.findByTestId('pause-screen');
+    await focusOn('Call Meera');
+    press('Enter');
+    expect(await screen.findByText("We couldn't reach Meera")).toBeTruthy();
+    expect(screen.getByText(/Please call Meera on your phone/)).toBeTruthy();
+    await vi.waitFor(() =>
+      expect(spoken(hub.posts)).toContain("I couldn't reach Meera. Please call Meera yourself. You don't need to open the door."),
+    );
+    await new Promise((r) => setTimeout(r, 7000)); // well past the 6 s success confirmation
+    expect(screen.queryByTestId('home-screen')).toBeNull();
+    press('Escape');
+    expect(await screen.findByTestId('home-screen')).toBeTruthy();
+  }, 20000);
+
   it('confirms the call aloud', async () => {
     const hub = fakeHub(withAlert(homeState(), pauseAlert()));
     render(<App client={hub.client} />);
     await screen.findByTestId('pause-screen');
     await focusOn('Call Meera');
     press('Enter');
-    await screen.findByText('Calling Meera now…');
-    await vi.waitFor(() => expect(spoken(hub.posts)).toContain("Calling Meera now. You don't need to open the door."));
+    await screen.findByText('Telling Meera now…');
+    await vi.waitFor(() => expect(spoken(hub.posts)).toContain("I've told Meera to call you. You don't need to open the door."));
   });
 
   it('reads aloud what Alexa sends to the TV, and new messages', async () => {
