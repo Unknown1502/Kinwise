@@ -4,6 +4,7 @@ import { PermissionError } from '../src/auth/identity.js';
 import { bootstrap } from '../src/bootstrap.js';
 import { loadConfig } from '../src/config.js';
 import { DEMO_HOUSEHOLD_ID, demoHousehold } from '../src/seed.js';
+import { signBody } from '../src/http/hmac.js';
 import { ackKey, signAck } from '../src/services/ackLink.js';
 import { KinwiseService, NotFoundError, ValidationError } from '../src/services/kinwise.js';
 import { MultiNotifier, OutboxNotifier, type Notifier } from '../src/services/notifier.js';
@@ -336,5 +337,47 @@ describe('the confirm link under attack', () => {
     const forged = Buffer.from(JSON.stringify({ h: DEMO_HOUSEHOLD_ID, k: callId, e: Math.floor(Date.now() / 1000) + 600 })).toString('base64url');
     expect((await h.call(`/ack/${forged}.${'a'.repeat(32)}`, { method: 'POST' })).status).toBe(403);
     expect(await h.notesFromMeera()).toBe(0);
+  });
+});
+
+describe('the demo doorbell is always a stranger', () => {
+  const tuesdayAideWindow = () => new Date('2026-10-13T14:30:00-04:00'); // the seeded aide is expected Tuesday 2-3 PM New York
+  const event = (over: Record<string, unknown> = {}): VisitorEvent =>
+    ({
+      eventId: `e-${Math.random()}`,
+      deviceId: 'd',
+      occurredAt: tuesdayAideWindow().toISOString(),
+      source: 'demo',
+      ringEventType: 'button_press',
+      perception: { personPresent: true, peopleCount: 1, description: 'a person' },
+      ...over,
+    }) as VisitorEvent;
+  const make = async () => {
+    const clock = { now: () => tuesdayAideWindow() };
+    const service = new KinwiseService({ store: new MemoryStore(), notifier: new OutboxNotifier(() => {}), clock });
+    await service.createHousehold(demoHousehold(clock.now()));
+    return service;
+  };
+
+  it('during an expected visit a normal event is a greeting, a demo "stranger" event is not', async () => {
+    const service = await make();
+    expect((await service.ingestVisitor(HH, event())).decision).toBe('expected');
+    expect((await service.ingestVisitor(HH, event({ unscheduled: true }))).decision).not.toBe('expected');
+  });
+
+  it('only a demo event can ignore the schedule: a Ring event that claims it is still matched to the visit', async () => {
+    const service = await make();
+    expect((await service.ingestVisitor(HH, event({ source: 'ring-webhook', unscheduled: true }))).decision).toBe('expected');
+  });
+
+  it('the signed Ring route strips the flag, and the dev doorbell sets it', async () => {
+    const config = loadConfig({ AUTH_MODE: 'dev', STORE: 'memory', CONCIERGE_URL: '' } as NodeJS.ProcessEnv);
+    const { app, service } = await bootstrap(config, { clock: { now: () => tuesdayAideWindow() } });
+    const res = await app.fetch(new Request('https://hub.example/dev/visitor', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }));
+    expect((await res.json()).decision).not.toBe('expected');
+    const raw = JSON.stringify({ householdId: HH, ...event({ source: 'demo', unscheduled: true, eventId: 'signed-1' }) });
+    const signed = await app.fetch(new Request('https://hub.example/events/visitor', { method: 'POST', headers: { 'content-type': 'application/json', 'x-kinwise-signature': signBody('dev-ingest-secret', raw) }, body: raw }));
+    expect((await signed.json()).decision).toBe('expected');
+    void service;
   });
 });

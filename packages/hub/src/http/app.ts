@@ -182,7 +182,9 @@ export function createApp(deps: AppDeps): Hono<Env> {
     } catch {
       throw new ValidationError('Body must be JSON');
     }
-    const { householdId, ...event } = body;
+    // `unscheduled` belongs to the demo doorbell only; a signed Ring event can never use it to skip the schedule.
+    const { householdId, unscheduled: _demoOnly, ...event } = body;
+    void _demoOnly;
     if (!householdId) throw new ValidationError('householdId is required');
     if (!event.perception || typeof event.perception.personPresent !== 'boolean') {
       throw new ValidationError('perception.personPresent is required');
@@ -306,6 +308,7 @@ export function createApp(deps: AppDeps): Hono<Env> {
       const personPresent = (body as { personPresent?: boolean }).personPresent ?? true;
       const result = await service.ingestVisitor(config.demoHouseholdId, {
         eventId: `demo-${Date.now()}`,
+        unscheduled: true,
         deviceId: 'demo-front-door',
         occurredAt: new Date().toISOString(),
         source: 'demo',

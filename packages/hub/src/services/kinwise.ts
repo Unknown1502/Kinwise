@@ -612,7 +612,8 @@ export class KinwiseService {
           consent: s.consent,
           privacyHourUntil: s.privacyHourUntil,
           riskWindow: s.riskWindow,
-          expectedVisits: s.expectedVisits,
+          // The demo doorbell is always a stranger, so the walkthrough works at any hour.
+          expectedVisits: event.source === 'demo' && event.unscheduled ? [] : s.expectedVisits,
           timezone: s.household.timezone,
         },
         event,

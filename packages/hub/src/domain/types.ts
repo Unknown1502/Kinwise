@@ -116,6 +116,8 @@ export interface VisitorEvent {
   source: 'ring-playground' | 'ring-webhook' | 'ring-poll' | 'demo';
   ringEventType: string;
   perception: Perception;
+  /** Demo doorbell only: ring as a stranger even during an expected visit. Ignored for any other source. */
+  unscheduled?: boolean;
 }
 
 export type AlertKind = 'pause' | 'gentle' | 'expected';

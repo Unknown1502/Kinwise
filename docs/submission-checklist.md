@@ -38,6 +38,6 @@ Every rule requirement, the evidence in this repo, and its status. ✅ done · �
 | Devpost text (inspiration, what it does, how we built it, challenges, accomplishments, learnings, what's next) | Written by the team in their own words | ⬜ |
 | Product Feedback for every tool used | Source notes: `docs/product-feedback-notes.md` (Alexa+, Ring, Fire TV/Vega, AWS) | ⬜ |
 | Friction Log (up to +10%) | `docs/friction-log.md`, 15 first-hand entries | ✅ (attach/link) |
-| Testing instructions for judges | Hosted endpoints + demo tokens (`node scripts/demo-tokens.mjs`) go in the private testing field, never the repo. Tell judges: the seeded household expects visitors Tuesday 2-3 PM and Thursday 10-11 AM New York time, so "Ring the doorbell" then greets instead of pausing; and the Pause needs a prior "is this call real?" question to be a Pause rather than a gentle note | ⬜ |
+| Testing instructions for judges | Hosted endpoints + demo tokens (`node scripts/demo-tokens.mjs`) go in the private testing field, never the repo. Tell judges: the Pause needs a prior "is this call real?" question (or a saved reminder that sounds like a scam) to be a Pause rather than a gentle note. The demo doorbell always rings as a stranger, at any hour (a real Ring event still honours the expected-visit schedule) | ⬜ |
 | Select tracks: Fire TV, Alexa+, Ring + both mini-challenges | Devpost form | ⬜ |
 | Submit a draft early (Oct 22), final by Oct 23 9:00 AM PT | Devpost | ⬜ |
