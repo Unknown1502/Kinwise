@@ -234,7 +234,7 @@ export function App() {
   );
 
   const onReset = useCallback(async () => {
-    const out = await resetDemo(config.hubUrl);
+    const out = await resetDemo(config.hubUrl, undefined, config.personas.asha.token);
     stopSpeaking();
     for (const c of Object.values(aborts.current)) c?.abort();
     aborts.current = {};
@@ -248,7 +248,7 @@ export function App() {
   const doorbellTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const onRing = useCallback(
     async (personPresent: boolean, showOnEcho: boolean) => {
-      const out = await ringDoorbell(config.hubUrl, { personPresent });
+      const out = await ringDoorbell(config.hubUrl, { personPresent }, undefined, config.personas.asha.token);
       if (!out.ok) return out.message;
       const summary = describeDecision(out.data);
       if (!showOnEcho || !personPresent || !out.data.alertId) return summary;
@@ -361,7 +361,7 @@ export function App() {
           </div>
         </div>
         <aside className="sidebar" aria-label="Demo companions">
-          <PhonePanel hubUrl={config.hubUrl} />
+          <PhonePanel hubUrl={config.hubUrl} token={config.personas.priya.token} />
           <DemoControls onReset={onReset} onRing={onRing} />
         </aside>
       </main>

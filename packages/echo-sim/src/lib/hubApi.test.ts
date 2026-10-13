@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { askConcierge, describeDecision, fetchNotices, parseNotices, ringDoorbell } from './hubApi';
+import { askConcierge, describeDecision, fetchNotices, parseNotices, resetDemo, ringDoorbell } from './hubApi';
 
 const json = (status: number, body: unknown) => async () =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -64,6 +64,35 @@ describe('notices', () => {
       }),
     ).toEqual({ status: 'offline' });
     expect(await fetchNotices('http://hub', json(200, { notices: [] }))).toEqual({ status: 'ok', notices: [] });
+  });
+});
+
+describe('dev routes on a hosted hub (they need a household token)', () => {
+  const capture = () => {
+    const seen: Array<{ url: string; auth: string | undefined }> = [];
+    const fetchImpl = async (url: string, init?: RequestInit) => {
+      seen.push({ url, auth: (init?.headers as Record<string, string> | undefined)?.authorization });
+      return new Response(JSON.stringify({ ok: true, notices: [], decision: 'pause' }), { status: 200 });
+    };
+    return { seen, fetchImpl };
+  };
+
+  it('sends the bearer token on notices, reset and the doorbell', async () => {
+    const { seen, fetchImpl } = capture();
+    await fetchNotices('http://hub', fetchImpl, 'tok-priya');
+    await resetDemo('http://hub', fetchImpl, 'tok-asha');
+    await ringDoorbell('http://hub', { personPresent: true }, fetchImpl, 'tok-asha');
+    expect(seen).toEqual([
+      { url: 'http://hub/dev/notices', auth: 'Bearer tok-priya' },
+      { url: 'http://hub/dev/reset', auth: 'Bearer tok-asha' },
+      { url: 'http://hub/dev/visitor', auth: 'Bearer tok-asha' },
+    ]);
+  });
+
+  it('still works without a token (a local dev hub needs none)', async () => {
+    const { seen, fetchImpl } = capture();
+    await fetchNotices('http://hub', fetchImpl);
+    expect(seen[0]!.auth).toBeUndefined();
   });
 });
 

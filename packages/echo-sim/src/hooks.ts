@@ -272,13 +272,13 @@ export function useWakeWord(onCommand: (text: string) => void, paused: boolean):
 }
 
 /** Poll {hub}/dev/notices every `ms` ("Priya's phone"). */
-export function useNotices(hubUrl: string, ms = 2000): NoticesOutcome | undefined {
+export function useNotices(hubUrl: string, token?: string, ms = 2000): NoticesOutcome | undefined {
   const [state, setState] = useState<NoticesOutcome | undefined>(undefined);
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const tick = async () => {
-      const out = await fetchNotices(hubUrl);
+      const out = await fetchNotices(hubUrl, undefined, token);
       if (!alive) return;
       setState((prev) => (prev && JSON.stringify(prev) === JSON.stringify(out) ? prev : out));
       // If the dev route is missing, check again rarely (the hub may be restarted with dev routes).

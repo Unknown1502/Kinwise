@@ -97,9 +97,12 @@ export function noticeKey(n: Notice): string {
   return `${n.at}|${n.kind}|${n.title}`;
 }
 
-export async function fetchNotices(hubUrl: string, fetchImpl: FetchImpl = defaultFetch): Promise<NoticesOutcome> {
+/** A hosted hub's dev routes need a household token; a local dev hub ignores it. */
+const bearer = (token?: string): Record<string, string> => (token ? { authorization: `Bearer ${token}` } : {});
+
+export async function fetchNotices(hubUrl: string, fetchImpl: FetchImpl = defaultFetch, token?: string): Promise<NoticesOutcome> {
   try {
-    const res = await fetchImpl(`${hubUrl}/dev/notices`, { cache: 'no-store' });
+    const res = await fetchImpl(`${hubUrl}/dev/notices`, { cache: 'no-store', headers: bearer(token) });
     if (res.status === 404) return { status: 'unavailable' };
     if (!res.ok) return { status: 'offline' };
     return { status: 'ok', notices: parseNotices(await readJson(res)) };
@@ -110,9 +113,9 @@ export async function fetchNotices(hubUrl: string, fetchImpl: FetchImpl = defaul
 
 export type DevOutcome<T> = { ok: true; data: T } | { ok: false; message: string };
 
-export async function resetDemo(hubUrl: string, fetchImpl: FetchImpl = defaultFetch): Promise<DevOutcome<{ ok: boolean }>> {
+export async function resetDemo(hubUrl: string, fetchImpl: FetchImpl = defaultFetch, token?: string): Promise<DevOutcome<{ ok: boolean }>> {
   try {
-    const res = await fetchImpl(`${hubUrl}/dev/reset`, { method: 'POST' });
+    const res = await fetchImpl(`${hubUrl}/dev/reset`, { method: 'POST', headers: bearer(token) });
     if (res.status === 404) return { ok: false, message: 'Dev routes are off on this hub (DEV_ROUTES=false).' };
     if (!res.ok) return { ok: false, message: `Reset failed (HTTP ${res.status}).` };
     return { ok: true, data: { ok: true } };
@@ -131,11 +134,12 @@ export async function ringDoorbell(
   hubUrl: string,
   body: { personPresent: boolean; description?: string; carrying?: string },
   fetchImpl: FetchImpl = defaultFetch,
+  token?: string,
 ): Promise<DevOutcome<VisitorResult>> {
   try {
     const res = await fetchImpl(`${hubUrl}/dev/visitor`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...bearer(token) },
       body: JSON.stringify(body),
     });
     if (res.status === 404) return { ok: false, message: 'Dev routes are off on this hub (DEV_ROUTES=false).' };

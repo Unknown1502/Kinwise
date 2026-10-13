@@ -124,7 +124,10 @@ export function originLine(state: HouseholdState, alert: Alert): string | undefi
   const reminder = earliest('reminder');
   const call = earliest('check');
   const signs = alert.riskLevel === 'high' ? 'courier-scam warning signs' : 'possible scam warning signs';
-  if (reminder && call) return `At ${reminder} a reminder you saved, and at ${call} a call you asked about, matched ${signs}.`;
+  if (reminder && call) {
+    if (reminder === call) return `At ${call} a reminder you saved and a call you asked about matched ${signs}.`;
+    return `At ${reminder} a reminder you saved, and at ${call} a call you asked about, matched ${signs}.`;
+  }
   if (call) return `At ${call} you asked Kinwise about a call, and it matched ${signs}.`;
   if (reminder) return `At ${reminder} a reminder you saved matched ${signs}.`;
   return undefined;

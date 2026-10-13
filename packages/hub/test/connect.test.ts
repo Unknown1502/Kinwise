@@ -70,6 +70,18 @@ describe('the Pause says where its warning came from', () => {
     );
   });
 
+  it('does not repeat a time when the reminder and the call share a minute', async () => {
+    const { service, clock } = ctx;
+    clock.t = local('10:20');
+    await service.addReminder(asha, { text: 'Courier from the bank picking up a package', at: local('14:00').toISOString() });
+    await service.checkCall(asha, { description: CALL });
+    clock.t = local('12:00');
+    await service.ingestVisitor(HH, visitor('v6', '12:00'));
+    expect((await service.tvState(tv)).activeAlert!.because).toBe(
+      'At 10:20 AM a reminder you saved and a call you asked about matched courier-scam warning signs.',
+    );
+  });
+
   it('S2.1: never repeats the words that were said', async () => {
     const { service, clock } = ctx;
     clock.t = local('10:20');

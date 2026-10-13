@@ -7,8 +7,8 @@ const KIND_ICON: Record<string, string> = { pause: '⏸', call_request: '📞', 
 const KIND_LABEL: Record<string, string> = { pause: 'Pause shown', call_request: 'Call request', risk_high: 'Warning signs' };
 
 /** "Priya's phone": the caregiver's notifications (polls the hub's dev outbox). */
-export function PhonePanel({ hubUrl }: { hubUrl: string }) {
-  const state = useNotices(hubUrl, 2000);
+export function PhonePanel({ hubUrl, token }: { hubUrl: string; token?: string }) {
+  const state = useNotices(hubUrl, token, 2000);
   if (state?.status === 'unavailable') return null; // dev route absent → hide
   const notices: Notice[] = state?.status === 'ok' ? state.notices : [];
   return (
