@@ -17,7 +17,7 @@ Every rule requirement, the evidence in this repo, and its status. ✅ done · �
 | Alexa+ | Simulated experience: source in repo and clearly shown as simulated | `packages/echo-sim` with a persistent "Simulated Alexa+ surface" label | ✅ |
 | Alexa+ | Hosted endpoint live through Nov 20 | AWS stack `Kinwise` (us-east-1); keep it deployed and keep credits funded | ✅ ⬜ (keep alive) |
 | Ring | Ring API/SDK/simulator imported and actually called at runtime | `agents/ring-worker` (official Partner API); verified on the Developer Playground 2026-10-06 | ✅ |
-| Ring | "Person at the door" on real Ring video | Needs a fresh Playground token (Playground live view closed) | ⬜ |
+| Ring | "Person at the door" on real Ring video | The Playground has only Package, Vehicle and Motion scenes and no way to pick one through the API (friction log #13); every real frame shows the Package clip with no person, and Kinwise correctly stays quiet. The Pause is shown from the labelled doorbell simulator through the same hub rules | ⚠️ real Ring proof is the empty-doorstep case; person case is simulated |
 | Fire TV | App runs on Vega OS (simulator acceptable) | `packages/tv-app` built with Vega SDK 0.24.12112; runs on the Vega Virtual Device, showing the Pause driven by the hosted hub (2026-10-07) | ✅ |
 
 ## Mini-challenges (one prize max; select both)
@@ -36,7 +36,7 @@ Every rule requirement, the evidence in this repo, and its status. ✅ done · �
 | Screenshots / gallery images | Echo Show cards, Fire TV Pause, Today board, family timeline, architecture diagram | ⬜ |
 | Devpost text (inspiration, what it does, how we built it, challenges, accomplishments, learnings, what's next) | Written by the team in their own words | ⬜ |
 | Product Feedback for every tool used | Source notes: `docs/product-feedback-notes.md` (Alexa+, Ring, Fire TV/Vega, AWS) | ⬜ |
-| Friction Log (up to +10%) | `docs/friction-log.md`, 11 first-hand entries | ✅ (attach/link) |
+| Friction Log (up to +10%) | `docs/friction-log.md`, 14 first-hand entries | ✅ (attach/link) |
 | Testing instructions for judges | Hosted endpoints + demo tokens (`node scripts/demo-tokens.mjs`) go in the private testing field, never the repo | ⬜ |
 | Select tracks: Fire TV, Alexa+, Ring + both mini-challenges | Devpost form | ⬜ |
 | Submit a draft early (Oct 22), final by Oct 23 9:00 AM PT | Devpost | ⬜ |

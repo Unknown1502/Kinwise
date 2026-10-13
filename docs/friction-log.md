@@ -95,3 +95,26 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
   6. Generated vpkg names follow the package.json name (`tv-app_x86_64.vpkg`), not `appName`, unlike several docs examples.
 - **Minutes lost:** ~90, mostly the stalled download plus diagnosing WSL networking.
 - **Suggestion:** document WSL2 as a supported (or "known to work") path, add `jq`/`libjpeg62` to the prerequisites, add retry and progress to SDK downloads, and offer a `--detach` option for `vega virtual-device start`.
+
+### 13. Ring Developer Playground: no person scene, no way to choose a scene, one slow token at a time (🟠, first-hand, 2026-10-13, from India)
+- **Task:** show a real "person at the door" from the Playground doorbell so the Fire TV Pause can be triggered by real Ring video.
+- **What the Playground offers:** step 3 "Simulate live view event" has three cards: **Package**, **Vehicle**, **Motion**. There is no person or visitor scene.
+- **Steps and actual results:**
+  1. Logged the network calls the Playground page makes when each card is clicked. All three send the **same** request, `POST /v1/devices/{id}/media/streaming/whep/sessions` (`content-type: application/sdp`), with nothing that names the scene. The scene is chosen on Ring's side, so a partner app cannot ask for one through the API.
+  2. Every frame we pulled through the API (live view on several days, plus the stored-image call) showed the same clip: a cardboard box on snowy steps. Nova 2 Lite described it correctly as "a snowy roof with a cardboard box"; Kinwise correctly raised no alert.
+  3. "Generate token" disables itself while a token is active. We saw it re-enable after 5 minutes once and after about 16 minutes another time, so a run of tests is paced by the slowest token. Closing or reloading the tab clears the page's token and locks steps 2 to 4 again, and the button may still be disabled.
+  4. While a stream from a scene card is playing, a video overlay sits over the other cards, so automated or fast clicks on the next scene fail until the stream is torn down.
+  5. The access token is displayed in full in the page and the sample curl command, which is handy but easy to leak in a screen recording.
+- **Expected:** a scene list that includes a person, a way to pick the scene from the API (even a query parameter), and a visible countdown for the token cooldown.
+- **Minutes lost:** ~90.
+- **Workaround:** the real Playground proves the Partner API path end to end (device list, WHEP live view, frame, neutral perception, no alert for an empty doorstep). The person-at-the-door moment is shown with Kinwise's own doorbell simulator, clearly labelled as simulated, through the same hub rules.
+- **Suggestion:** add a "Person" or "Visitor" scene, accept the scene as a parameter on the WHEP session request, and show when the next token can be generated.
+
+### 14. Vega Virtual Device: restarts after an unclean stop fail without saying why (🟠, first-hand, 2026-10-07 to 2026-10-13)
+- **Task:** keep the Vega Virtual Device running to test and film the Fire TV app.
+- **Friction, in order:**
+  1. After the emulator stops uncleanly (its WSL session ended, or the machine ran short of memory), `vega virtual-device start` waits the full 240 s and ends with *"Deadline reached but virtual device unresponsive"*. The real cause is only in the instance's own `virtual_device.err`: *"Running multiple emulators with the same AVD is an experimental feature. Please use -read-only"*, caused by stale `hardware-qemu.ini.lock` and `multiinstance.lock` files that nothing removes. Deleting those two files (with no emulator running) fixes it.
+  2. `vega run-app` issued right after the device appears in `vega device list` can fail with *"Cannot read properties of undefined (reading 'trim')"* (a CLI error, not a device error). Waiting about 30 seconds and retrying works. Our run-app scripts now retry.
+  3. `vega device list` and `vega virtual-device status` can hang indefinitely while the emulator is still booting under memory pressure, and leave stuck `vda` child processes that block later commands.
+- **Minutes lost:** ~60 across several restarts.
+- **Suggestion:** have `vega virtual-device start` detect and clear stale lock files, print the contents of `virtual_device.err` when the device is unresponsive, and make `device list` and `status` time out with a clear message.
