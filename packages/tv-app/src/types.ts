@@ -107,7 +107,14 @@ export interface TvStateView {
   accessLog: AccessLogEntry[];
   /** Something Alexa asked this TV to read aloud (present for two minutes; play each id once). */
   cue?: {id: string; topic: 'messages' | 'today'; text: string};
+  /** The latest "Call" request within the hour: asked, waiting (second message sent), unanswered or confirmed. */
+  call?: CallView;
   serverTime: string;
+}
+
+export interface CallView {
+  caregiverName: string;
+  status: 'asked' | 'waiting' | 'unanswered' | 'confirmed';
 }
 
 export interface RespondResult {

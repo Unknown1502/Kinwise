@@ -29,6 +29,15 @@ export function narration(prev: TvStateView | undefined, next: TvStateView): str
     lines.push(`Kinwise is watching the door more closely${until ? ` until ${until}` : ''}, because of today's warning signs.`);
   }
 
+  const call = next.call;
+  if (call && call.status !== prev.call?.status) {
+    if (call.status === 'waiting') {
+      lines.push(`${call.caregiverName} hasn't answered yet. I've sent a second message. You can also call ${call.caregiverName} yourself.`);
+    } else if (call.status === 'unanswered') {
+      lines.push(`${call.caregiverName} still hasn't answered. Please call ${call.caregiverName} yourself, or someone you trust.`);
+    }
+  }
+
   if (next.cue && next.cue.id !== prev.cue?.id) lines.push(next.cue.text);
   return lines;
 }

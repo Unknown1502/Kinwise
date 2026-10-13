@@ -53,6 +53,16 @@ describe('narration', () => {
     expect(narration(after, {...after})).toEqual([]);
   });
 
+  it('says so when nobody has answered the call, once per change', () => {
+    const asked = homeState({call: {caregiverName: 'Meera', status: 'asked'}});
+    const waiting = homeState({call: {caregiverName: 'Meera', status: 'waiting'}});
+    const unanswered = homeState({call: {caregiverName: 'Meera', status: 'unanswered'}});
+    expect(narration(asked, waiting)).toEqual(["Meera hasn't answered yet. I've sent a second message. You can also call Meera yourself."]);
+    expect(narration(waiting, waiting)).toEqual([]);
+    expect(narration(waiting, unanswered)).toEqual(["Meera still hasn't answered. Please call Meera yourself, or someone you trust."]);
+    expect(narration(unanswered, homeState({call: {caregiverName: 'Meera', status: 'confirmed'}}))).toEqual([]);
+  });
+
   it('words each kind of visitor and the call plainly', () => {
     expect(alertLine(expectedAlert(), 'Asha')).toBe("Luis (gardener) is at the door. They're on today's list.");
     expect(callingLine('Meera')).toBe("I've told Meera to call you. You don't need to open the door.");

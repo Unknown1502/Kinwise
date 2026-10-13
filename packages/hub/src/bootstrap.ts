@@ -5,7 +5,7 @@ import { checkNtfyTopic, parseWhatsApp, type HubConfig } from './config.js';
 import { AgentCoreConcierge, HttpConcierge, type ConciergeClient } from './http/concierge.js';
 import { createApp } from './http/app.js';
 import { demoHousehold } from './seed.js';
-import { KinwiseService } from './services/kinwise.js';
+import { KinwiseService, type Clock } from './services/kinwise.js';
 import { PollySynth, type SpeechSynth } from './speech/speech.js';
 import { ackKey, signAck } from './services/ackLink.js';
 import { MultiNotifier, NtfyNotifier, OutboxNotifier, SnsNotifier, WhatsAppNotifier, type Notifier } from './services/notifier.js';
@@ -35,8 +35,8 @@ async function resolveSecrets(config: HubConfig): Promise<{ config: HubConfig; d
   return { config: resolved, demoIdentities };
 }
 
-/** `inject` lets tests swap in a fake voice instead of calling Amazon Polly, and a fake network for the phone push. */
-export async function bootstrap(input: HubConfig, inject: { speech?: SpeechSynth; fetch?: typeof globalThis.fetch } = {}) {
+/** `inject` lets tests swap in a fake voice instead of calling Amazon Polly, and a fake network for the phone push, and a fixed clock so a test does not depend on the time of day. */
+export async function bootstrap(input: HubConfig, inject: { speech?: SpeechSynth; fetch?: typeof globalThis.fetch; clock?: Clock } = {}) {
   const { config, demoIdentities } = await resolveSecrets(input);
 
   const store: Store =
@@ -56,7 +56,7 @@ export async function bootstrap(input: HubConfig, inject: { speech?: SpeechSynth
   }
   if (config.whatsapp?.creds) channels.push(new WhatsAppNotifier({ ...config.whatsapp.creds, fetch: inject.fetch, ackUrl }));
   const notifier: Notifier = channels.length > 1 ? new MultiNotifier(channels) : outbox;
-  const service = new KinwiseService({ store, notifier });
+  const service = new KinwiseService({ store, notifier, clock: inject.clock });
 
   const deviceTokens: Record<string, Identity> = Object.fromEntries(
     Object.entries(config.deviceTokens).map(([token, d]) => [
@@ -86,7 +86,7 @@ export async function bootstrap(input: HubConfig, inject: { speech?: SpeechSynth
     (config.speech.provider === 'polly' ? new PollySynth(config.speech.voice, config.speech.engine, config.speech.region) : undefined);
 
   const seed = () => {
-    const fresh = demoHousehold(new Date(), config.demoTimezone, config.demoPauseVideoUrl);
+    const fresh = demoHousehold(inject.clock?.now() ?? new Date(), config.demoTimezone, config.demoPauseVideoUrl);
     return { ...fresh, household: { ...fresh.household, id: config.demoHouseholdId } };
   };
   if (config.seedDemo && !(await service.exists(config.demoHouseholdId))) {

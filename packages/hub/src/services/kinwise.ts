@@ -88,7 +88,15 @@ export interface TvStateView {
   accessLog: Array<{ timeLabel: string; actor: string; action: string }>;
   /** What Alexa last asked the TV to read aloud, for two minutes. */
   cue?: { id: string; topic: TvCue['topic']; text: string };
+  /** The latest "Call" request while it is still within the hour: has anyone answered? */
+  call?: CallView;
   serverTime: string;
+}
+
+export interface CallView {
+  caregiverName: string;
+  /** asked: just sent · waiting: no answer for 2 min and a second message went out · unanswered: still nothing after 5 min · confirmed: she said she is calling */
+  status: 'asked' | 'waiting' | 'unanswered' | 'confirmed';
 }
 
 /** How long a "read it on the TV" request stays pending for a TV that is polling. */
@@ -112,6 +120,9 @@ interface Pending {
 
 /** How long after pressing "Call Meera" her "I'm calling now" button still works. */
 const CALL_CONFIRM_MS = 60 * 60_000;
+/** No confirmation after this long: send the second message. After UNANSWERED_AFTER_MS the TV says plainly nobody has answered. */
+export const RESEND_AFTER_MS = 2 * 60_000;
+export const UNANSWERED_AFTER_MS = 5 * 60_000;
 
 export function adviceFor(level: RiskLevel, categories: readonly SignalCategory[], caregiverName: string): string[] {
   const advice =
@@ -689,7 +700,12 @@ export class KinwiseService {
 
   async tvState(actor: Identity): Promise<TvStateView> {
     this.requireResident(actor);
-    const { state, now } = await this.read(actor.householdId);
+    let { state, now } = await this.read(actor.householdId);
+    // The TV polls every two seconds while Asha waits, so it is also what notices that nobody has answered.
+    if (resendDue(state, now)) {
+      await this.resendCall(actor.householdId);
+      ({ state, now } = await this.read(actor.householdId));
+    }
     const alert = activeAlert(state);
     const cg = caregivers(state)[0];
     const tz = state.household.timezone;
@@ -714,12 +730,55 @@ export class KinwiseService {
         state.tvCue && now.getTime() - Date.parse(state.tvCue.at) < TV_CUE_MS
           ? { id: state.tvCue.id, topic: state.tvCue.topic, text: state.tvCue.text }
           : undefined,
+      call: callView(state, now),
       serverTime: now.toISOString(),
     };
+  }
+
+  /** Second message to the caregiver. Re-checks inside the write, so many polls at once send exactly one. */
+  private async resendCall(householdId: string): Promise<void> {
+    await this.mutate(householdId, (s, now, pending) => {
+      if (!resendDue(s, now)) return;
+      s.callRequest!.resentAt = now.toISOString();
+      const residentName = resident(s).name;
+      for (const c of caregivers(s)) {
+        pending.notices.push({
+          householdId: s.household.id,
+          caregiverId: c.id,
+          caregiverName: c.name,
+          kind: 'call_request',
+          title: `${residentName} is still waiting for you`,
+          body: `${residentName} asked you to call a few minutes ago and nobody has confirmed yet. Please call now.`,
+          at: now.toISOString(),
+          callId: s.callRequest!.id,
+        });
+      }
+      addTimeline(s, now, 'alert_resolved', `Nobody had answered, so Kinwise sent ${primaryCaregiverName(s)} a second message.`);
+    });
   }
 }
 
 // ───────────────────────────── helpers ─────────────────────────────
+
+function resendDue(s: HouseholdState, now: Date): boolean {
+  const call = s.callRequest;
+  if (!call || call.ackedAt || call.resentAt) return false;
+  const age = now.getTime() - Date.parse(call.requestedAt);
+  return age >= RESEND_AFTER_MS && age <= CALL_CONFIRM_MS;
+}
+
+function callView(s: HouseholdState, now: Date): CallView | undefined {
+  const call = s.callRequest;
+  if (!call) return undefined;
+  const age = now.getTime() - Date.parse(call.requestedAt);
+  if (age > CALL_CONFIRM_MS) return undefined;
+  const caregiverName = primaryCaregiverName(s);
+  if (call.ackedAt) return { caregiverName, status: 'confirmed' };
+  if (age >= UNANSWERED_AFTER_MS) return { caregiverName, status: 'unanswered' };
+  if (age >= RESEND_AFTER_MS) return { caregiverName, status: 'waiting' };
+  return { caregiverName, status: 'asked' };
+}
+
 
 function maxLevelOf(a: RiskLevel, b: RiskLevel): RiskLevel {
   const rank = { none: 0, elevated: 1, high: 2 } as const;

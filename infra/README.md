@@ -59,8 +59,13 @@ notice. If none did, the TV says "We couldn't reach Meera" instead of promising 
 | SMS | not built | |
 
 Every message carries only the title and body of the notice, and a call request carries a signed link that expires after an hour.
-Opening it shows one button; pressing **I'm calling now** puts a note from Meera on Asha's TV. "Delivered" means a channel accepted the
-message, not that a person read it. Not built: re-sending after a few minutes, a second caregiver, escalation.
+Opening it shows one button; pressing **I'm calling now** puts a note from Meera on Asha's TV.
+
+**When nobody answers.** "Delivered" only means a channel accepted the message, not that a person read it, so the TV keeps asking:
+after **2 minutes** with no confirmation the hub sends a second message ("Asha is still waiting for you", the same confirm link) and the
+TV's status chip turns amber ("Meera hasn't answered yet") and says so aloud; after **5 minutes** it says "Meera still hasn't answered.
+Please call Meera yourself." Exactly one second message is sent, even when the TV polls many times at once. All caregivers get the same
+message on the shared channels; a separate address per caregiver and SMS are not built.
 
 #### E-mail (the demo route)
 

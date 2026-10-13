@@ -119,9 +119,12 @@ describe('the Pause says where its warning came from', () => {
 
 describe('MCP tools still match their output schema with the origin line', () => {
   it('serves `because` to the resident and withholds it from the caregiver, through a real MCP client', async () => {
-    const { app, service } = await bootstrap(loadConfig({ AUTH_MODE: 'dev', STORE: 'memory', CONCIERGE_URL: '' } as NodeJS.ProcessEnv));
-    // The bootstrap household uses the real clock: run the story "now".
-    const now = Date.now();
+    // A fixed Wednesday morning, so the story does not depend on when it runs (the seed expects visitors Tuesday 2-3 PM and Thursday 10-11 AM New York).
+    const fixed = new Date('2026-10-07T10:00:00-04:00');
+    const { app, service } = await bootstrap(loadConfig({ AUTH_MODE: 'dev', STORE: 'memory', CONCIERGE_URL: '' } as NodeJS.ProcessEnv), {
+      clock: { now: () => fixed },
+    });
+    const now = fixed.getTime();
     await service.checkCall(asha, { description: CALL });
     await service.ingestVisitor(HH, { ...visitor('mcp1', '12:00'), occurredAt: new Date(now).toISOString() });
 

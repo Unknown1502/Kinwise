@@ -110,8 +110,18 @@ export interface StatusNote {
 }
 
 /** The status in the corner of the home screen, as a title and one line of detail. */
-export function statusNote(state: Pick<TvStateView, 'today' | 'consent'>, privacyMinutesLeft?: number): StatusNote {
-  const {today, consent} = state;
+export function statusNote(state: Pick<TvStateView, 'today' | 'consent' | 'call'>, privacyMinutesLeft?: number): StatusNote {
+  const {today, consent, call} = state;
+  // A family member who has not answered outranks everything else on the chip.
+  if (call?.status === 'unanswered') {
+    return {tone: 'caution', title: `${call.caregiverName} still hasn't answered`, detail: `Please call ${call.caregiverName} yourself`};
+  }
+  if (call?.status === 'waiting') {
+    return {tone: 'caution', title: `${call.caregiverName} hasn't answered yet`, detail: 'We sent a second message. You can call too'};
+  }
+  if (call?.status === 'asked') {
+    return {tone: 'ok', title: `${call.caregiverName} has been told`, detail: 'An answer will appear here'};
+  }
   if (today.privacyHourUntilLabel) {
     const until = today.privacyHourUntilLabel;
     return {

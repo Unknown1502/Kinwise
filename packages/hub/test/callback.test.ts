@@ -4,6 +4,7 @@ import { PermissionError } from '../src/auth/identity.js';
 import { bootstrap } from '../src/bootstrap.js';
 import { loadConfig } from '../src/config.js';
 import { DEMO_HOUSEHOLD_ID, demoHousehold } from '../src/seed.js';
+import { ackKey, signAck } from '../src/services/ackLink.js';
 import { KinwiseService, NotFoundError, ValidationError } from '../src/services/kinwise.js';
 import { MultiNotifier, OutboxNotifier, type Notifier } from '../src/services/notifier.js';
 import { MemoryStore } from '../src/store/memory.js';
@@ -103,6 +104,59 @@ describe('Meera confirms she is calling', () => {
     await expect(ctx.service.acknowledgeCall(meera, 'call_999')).rejects.toBeInstanceOf(NotFoundError);
     ctx.clock.t = new Date(ctx.clock.t.getTime() + 61 * 60_000);
     await expect(ctx.service.acknowledgeCall(meera, callId)).rejects.toBeInstanceOf(ValidationError);
+  });
+});
+
+describe('Nobody answered: re-send, then say so', () => {
+  const MIN = 60_000;
+  let ctx: ReturnType<typeof setup>;
+  beforeEach(async () => {
+    ctx?.restore();
+    ctx = setup('works');
+    await pressCall(ctx);
+  });
+  const requests = () => ctx.outbox.outbox.filter((n) => n.kind === 'call_request');
+  const at = (minutes: number) => (ctx.clock.t = new Date(local('14:41').getTime() + minutes * MIN));
+
+  it('says "asked" for the first two minutes and sends nothing more', async () => {
+    at(1);
+    expect((await ctx.service.tvState(tv)).call).toMatchObject({ status: 'asked', caregiverName: 'Meera' });
+    expect(requests()).toHaveLength(1);
+  });
+
+  it('re-sends once after two minutes, even when the TV polls many times at once', async () => {
+    at(2.5);
+    const polls = await Promise.all([ctx.service.tvState(tv), ctx.service.tvState(tv), ctx.service.tvState(tv)]);
+    await ctx.service.tvState(tv);
+    expect(requests()).toHaveLength(2);
+    expect(requests()[0]).toMatchObject({ title: expect.stringMatching(/still waiting/i), callId: requests()[1]!.callId });
+    expect(polls.every((p) => p.call?.status === 'waiting')).toBe(true);
+  });
+
+  it('says "unanswered" after five minutes, with no third message', async () => {
+    at(2.5);
+    await ctx.service.tvState(tv);
+    at(5.5);
+    expect((await ctx.service.tvState(tv)).call?.status).toBe('unanswered');
+    expect(requests()).toHaveLength(2);
+  });
+
+  it('stops asking once Meera confirms, and the call fades from the TV after an hour', async () => {
+    const callId = requests()[0]!.callId!;
+    at(1);
+    await ctx.service.acknowledgeCall(meera, callId);
+    at(10);
+    const st = await ctx.service.tvState(tv);
+    expect(st.call?.status).toBe('confirmed');
+    expect(requests()).toHaveLength(1);
+    at(61);
+    expect((await ctx.service.tvState(tv)).call).toBeUndefined();
+  });
+
+  it('never re-sends a request that is already over an hour old', async () => {
+    at(90);
+    expect((await ctx.service.tvState(tv)).call).toBeUndefined();
+    expect(requests()).toHaveLength(1);
   });
 });
 
@@ -211,5 +265,76 @@ describe('over HTTP: the push button and the confirm page', () => {
     const res = await h.call(`/caregiver/calls/${notice.callId}/ack`, { method: 'POST' }, 'dev-priya');
     expect(res.status).toBe(200);
     expect((await (await h.call('/tv/state', {}, 'dev-tv')).json()).today.messages[0].from).toBe('Meera');
+  });
+});
+
+describe('the confirm link under attack', () => {
+  const secret = 'dev-ingest-secret'; // dev mode's ingest secret: what the app signs with
+  async function app() {
+    const config = loadConfig({ AUTH_MODE: 'dev', STORE: 'memory', CONCIERGE_URL: '' } as NodeJS.ProcessEnv);
+    const { app: hono } = await bootstrap(config);
+    const call = (path: string, init: RequestInit = {}, token?: string) =>
+      hono.fetch(new Request(`https://hub.example${path}`, { ...init, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(init.headers ?? {}) } }));
+    const press = async () => {
+      const ring = await (await call('/dev/visitor', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json();
+      await call(`/tv/alerts/${ring.alertId}/respond`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'call_family' }) }, 'dev-tv');
+      const notices = (await (await call('/dev/notices')).json()).notices as Array<{ callId?: string }>;
+      return notices.find((n) => n.callId)!.callId!;
+    };
+    const notesFromMeera = async () => (await (await call('/tv/state', {}, 'dev-tv')).json()).today.messages.filter((m: any) => m.from === 'Meera').length;
+    return { call, press, notesFromMeera };
+  }
+  const link = (householdId: string, callId: string, nowMs = Date.now()) => signAck(ackKey(secret), { householdId, callId }, nowMs);
+
+  it('a valid link for another household cannot confirm this household call', async () => {
+    const h = await app();
+    const callId = await h.press();
+    const res = await h.call(`/ack/${link('hh-someone-else', callId)}`, { method: 'POST' });
+    expect(res.status).toBe(404);
+    expect(await h.notesFromMeera()).toBe(0);
+  });
+
+  it('a link for an earlier call stops working once a newer call is made', async () => {
+    const h = await app();
+    const first = await h.press();
+    const second = await h.press();
+    expect(second).not.toBe(first);
+    expect((await h.call(`/ack/${link(DEMO_HOUSEHOLD_ID, first)}`, { method: 'POST' })).status).toBe(404);
+    expect(await h.notesFromMeera()).toBe(0);
+    expect((await h.call(`/ack/${link(DEMO_HOUSEHOLD_ID, second)}`, { method: 'POST' })).status).toBe(200);
+    expect(await h.notesFromMeera()).toBe(1);
+  });
+
+  it('a link that is expired by one second, or enormous, or full of markup, is refused cleanly (403, never 500)', async () => {
+    const h = await app();
+    const callId = await h.press();
+    expect((await h.call(`/ack/${link(DEMO_HOUSEHOLD_ID, callId, Date.now() - 3601_000)}`, { method: 'POST' })).status).toBe(403);
+    for (const junk of ['x'.repeat(5000), '<script>alert(1)</script>', '%00%ff', '....']) {
+      for (const method of ['GET', 'POST']) {
+        const res = await h.call(`/ack/${encodeURIComponent(junk)}`, { method });
+        expect(res.status).toBe(403);
+        expect(await res.text()).not.toContain('<script>alert');
+      }
+    }
+    expect(await h.notesFromMeera()).toBe(0);
+  });
+
+  it('a link cannot be used to confirm by asking with the wrong HTTP method or by crawling', async () => {
+    const h = await app();
+    const callId = await h.press();
+    const url = `/ack/${link(DEMO_HOUSEHOLD_ID, callId)}`;
+    for (const method of ['GET', 'HEAD']) await h.call(url, { method });
+    expect(await h.notesFromMeera()).toBe(0);
+    expect((await h.call(url, { method: 'PUT' })).status).toBe(404);
+    expect((await h.call(url, { method: 'DELETE' })).status).toBe(404);
+    expect(await h.notesFromMeera()).toBe(0);
+  });
+
+  it('a speech link or a forged payload is not accepted as a confirm link', async () => {
+    const h = await app();
+    const callId = await h.press();
+    const forged = Buffer.from(JSON.stringify({ h: DEMO_HOUSEHOLD_ID, k: callId, e: Math.floor(Date.now() / 1000) + 600 })).toString('base64url');
+    expect((await h.call(`/ack/${forged}.${'a'.repeat(32)}`, { method: 'POST' })).status).toBe(403);
+    expect(await h.notesFromMeera()).toBe(0);
   });
 });

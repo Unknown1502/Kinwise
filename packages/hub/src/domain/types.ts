@@ -185,6 +185,8 @@ export interface TvCue {
 export interface CallRequest {
   id: string;
   requestedAt: string;
+  /** Set when Kinwise sent the second message because nobody had confirmed. */
+  resentAt?: string;
   ackedAt?: string;
 }
 

@@ -66,5 +66,13 @@ describe('privacy time left', () => {
     expect(statusNote(state, 58)).toEqual({tone: 'privacy', title: 'Privacy time', detail: '58 minutes left, until 3:19 PM'});
     expect(statusNote(state, 0).detail).toBe('Until 3:19 PM');
     expect(statusNote(homeState())).toEqual({tone: 'ok', title: 'Kinwise is on', detail: 'Looking out for unexpected visitors'});
+    const withCall = (status: 'asked' | 'waiting' | 'unanswered' | 'confirmed') => homeState({call: {caregiverName: 'Meera', status}});
+    expect(statusNote(withCall('asked'))).toEqual({tone: 'ok', title: 'Meera has been told', detail: 'An answer will appear here'});
+    expect(statusNote(withCall('waiting'))).toEqual({tone: 'caution', title: "Meera hasn't answered yet", detail: 'We sent a second message. You can call too'});
+    expect(statusNote(withCall('unanswered'))).toEqual({tone: 'caution', title: "Meera still hasn't answered", detail: 'Please call Meera yourself'});
+    expect(statusNote(withCall('confirmed')).title).toBe('Kinwise is on');
+    // An unanswered call is more urgent than privacy time.
+    const priv = withCall('unanswered');
+    expect(statusNote({...priv, today: {...priv.today, privacyHourUntilLabel: '3:19 PM'}}, 40).title).toBe("Meera still hasn't answered");
   });
 });
