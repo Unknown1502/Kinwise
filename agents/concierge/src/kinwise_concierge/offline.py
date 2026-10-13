@@ -23,6 +23,11 @@ _SCAM_WORDS = re.compile(
     r"bitcoin|crypto|courier|wire|warrant|compromised|legit|real|scam)\b",
     re.I,
 )
+# "Call Meera", "Alexa, call Anika please": the whole utterance is "call <a first name>". Kept free of any
+# one family member's name, so it works for whoever the household's caregiver is.
+_CALL_A_NAME = re.compile(
+    r"^\W*(?:[Aa]lexa\W+)?(?:[Pp]lease\s+)?(?:[Cc]all|[Rr]ing|[Pp]hone)\s+[A-Z][a-z]{1,20}(?:\s+(?:now|please|right now|for me))?\W*$"
+)
 _TIME = re.compile(r"\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?(?=\b|$)", re.I)
 _RANGE = re.compile(
     r"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:to|-|until|till)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b", re.I
@@ -116,7 +121,7 @@ def classify(persona: str, text: str, now: datetime) -> Intent:
             return Intent("kinwise_read_on_tv", {"topic": "messages"})
         if on_tv and re.search(r"\b(today|day|plan|schedule)\b", t):
             return Intent("kinwise_read_on_tv", {"topic": "today"})
-        if re.search(r"\b(call|ring|phone)\s+(priya|my daughter|family)\b", t):
+        if re.search(r"\b(call|ring|phone)\s+(my daughter|my family|family)\b", t) or _CALL_A_NAME.match(text):
             return Intent("call_family", {})
         if _SCAM_WORDS.search(t) and not re.search(r"\btoday\b.*\bhappening\b", t):
             return Intent("kinwise_check_call", {"description": text})
@@ -161,7 +166,7 @@ async def answer_offline(req: AskRequest, hub_mcp_url: str) -> AskResponse:
                 )
                 reply = text_of(result)
             else:
-                reply = "I'll let Priya know you'd like to talk. In this simulation I can't place phone calls."
+                reply = "I'll let Meera know you'd like to talk. In this simulation I can't place phone calls."
         else:
             result = await mcp.call(intent.tool, intent.args)
             reply = text_of(result) or "Done."

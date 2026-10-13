@@ -16,9 +16,9 @@ console.log(`
 Hub:            ${out.ApiUrl}
 MCP endpoint:   ${out.McpEndpoint}
 Asha (resident) ${derive('asha')}
-Priya (family)  ${derive('priya')}
+Meera (family)  ${derive('priya')}
 Living-room TV  ${derive('tv')}
 
-Echo simulator: VITE_HUB_URL=${out.ApiUrl} VITE_ASHA_TOKEN=<Asha> VITE_PRIYA_TOKEN=<Priya> npm run dev
+Echo simulator: VITE_HUB_URL=${out.ApiUrl} VITE_ASHA_TOKEN=<Asha> VITE_PRIYA_TOKEN=<Meera> npm run dev
 TV preview:     http://localhost:5174/?hub=${out.ApiUrl}&token=<TV>
 `);

@@ -36,7 +36,7 @@ const fixtures: Record<string, () => TvStateView> = {
   onboarding: () => notOnboarded(home),
   proposals: () =>
     homeState({
-      pendingProposals: [{id: 'visit_luis', label: 'Luis (gardener)', when: 'Thursdays 9:00 AM', proposedBy: 'Priya'}],
+      pendingProposals: [{id: 'visit_luis', label: 'Luis (gardener)', when: 'Thursdays 9:00 AM', proposedBy: 'Meera'}],
       today: {...home.today, safety: {level: 'elevated', untilLabel: '8:18 PM', signs: SIGNS.slice(0, 1)}},
     }),
 };

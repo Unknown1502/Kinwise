@@ -18,7 +18,7 @@ export interface Notifier {
   notify(notice: CaregiverNotice): Promise<void>;
 }
 
-/** Local/dev notifier: logs and keeps a short outbox the demo UI can show as "Priya's phone". */
+/** Local/dev notifier: logs and keeps a short outbox the demo UI can show as "Meera's phone". */
 export class OutboxNotifier implements Notifier {
   readonly outbox: CaregiverNotice[] = [];
 

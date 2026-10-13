@@ -21,7 +21,7 @@ const CACHE_SIZE = 64;
 
 export class PollySynth implements SpeechSynth {
   private readonly client: PollyClient;
-  /** Recent phrases ("Calling Priya now…") repeat a lot; keep their audio per container. */
+  /** Recent phrases ("Calling Meera now…") repeat a lot; keep their audio per container. */
   private readonly cache = new Map<string, Uint8Array>();
 
   constructor(

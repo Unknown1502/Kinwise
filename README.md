@@ -21,9 +21,9 @@ No single device sees both steps. The conversation happens in one place and the 
 ## What it does
 
 1. **10:15** Asha (78, lives alone) tells Alexa: *"Remind me at 2: a courier from the bank is picking up a package."* Kinwise saves the reminder, notices two warning signs and gently asks whether someone called her.
-2. **10:20** *"A man from the FTC called… withdraw my savings as gold… a courier will come… don't tell my family. Is that real?"* Kinwise finds 5 of its 6 courier-scam warning signs and explains them kindly. It starts watching the door more closely for 6 hours and lets her daughter Priya know, as a signal only.
-3. **14:41** A stranger rings the Ring doorbell. **Asha's Fire TV shows the Pause and says it aloud**: *"Asha, someone is at your door, and no visit is expected right now. Please pause before you open it."* Priya's recorded message appears with captions, and **[Call Priya]** is already focused on the remote.
-4. Asha presses it. Priya's phone gets a call request. Later Priya asks her own Alexa, *"How's Mom's day?"*, and sees a timeline of **signals, never recordings**.
+2. **10:20** *"A man from the FTC called… withdraw my savings as gold… a courier will come… don't tell my family. Is that real?"* Kinwise finds 5 of its 6 courier-scam warning signs and explains them kindly. It starts watching the door more closely for 6 hours and lets her daughter Meera know, as a signal only.
+3. **14:41** A stranger rings the Ring doorbell. **Asha's Fire TV shows the Pause and says it aloud**: *"Asha, someone is at your door, and no visit is expected right now. Please pause before you open it."* Meera's recorded message appears with captions, and **[Call Meera]** is already focused on the remote.
+4. Asha presses it. Meera's phone gets a call request. Later Meera asks her own Alexa, *"How's Mom's day?"*, and sees a timeline of **signals, never recordings**.
 
 On ordinary days the TV is Asha's calm home screen: expected visitors (the gardener at 10 doesn't trigger anything), reminders and notes from family.
 

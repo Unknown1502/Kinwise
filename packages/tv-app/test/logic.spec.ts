@@ -69,16 +69,16 @@ describe('pause copy', () => {
     const text = pauseAnnouncement(pauseAlert());
     expect(text).toContain('Pause before you open the door.');
     expect(text).toContain('3 courier-scam warning signs');
-    expect(text).toContain('A message from Priya: Mom, it');
-    expect(text).toContain('Call Priya is selected.');
+    expect(text).toContain('A message from Meera: Mom, it');
+    expect(text).toContain('Call Meera is selected.');
   });
 });
 
 describe('consent copy', () => {
   it('names the caregiver and keeps each explanation to one short line', () => {
-    const items = consentItems('Priya');
+    const items = consentItems('Meera');
     expect(items.map((i) => i.key)).toEqual(['scamScreening', 'doorAwareness', 'caregiverAlerts', 'shareTimelineWithCaregiver']);
-    expect(items[2]!.title).toContain('Priya');
+    expect(items[2]!.title).toContain('Meera');
     for (const item of items) expect(item.explanation.length).toBeLessThanOrEqual(95);
   });
 });

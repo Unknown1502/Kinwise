@@ -13,7 +13,7 @@ Kinwise is **the resident's second opinion, not the caregiver's camera.** The re
 ## 2. Personas
 
 - **Asha (resident, 78)** lives alone. She uses an Echo Show (simulated Alexa+) and a Fire TV. A Ring doorbell watches her front door.
-- **Priya (caregiver, 46)** is her daughter in another city. She has her own Alexa (simulated) and receives alerts (signals only, never recordings).
+- **Meera (caregiver, 46)** is her daughter in another city. She has her own Alexa (simulated) and receives alerts (signals only, never recordings).
 
 ## 3. Tracks and how each is used at runtime
 
@@ -31,7 +31,7 @@ Echo Show sim (web) ──ask──► concierge (Strands, AgentCore) ──MCP�
         │                                                             │
         └──resources/read (MCP Apps UI) ───────────────────────────► hub /mcp
 Ring Playground/API ◄── ring-worker (poll · WHEP frame · webhook) ──signed event──► hub /events/visitor
-Fire TV app (Vega) ──poll──► hub /tv/*                hub ──► Notifier (SNS / console) ──► Priya
+Fire TV app (Vega) ──poll──► hub /tv/*                hub ──► Notifier (SNS / console) ──► Meera
 ```
 
 - **hub** (TypeScript, Node 22, Hono). Owns all state and every decision. Runs locally with `npm run dev`, or on AWS Lambda behind API Gateway.
@@ -94,7 +94,7 @@ Appearance is **never** an input. Only presence, time, expected visits and the r
 ### 5.7 Alert resolution
 
 Asha resolves an alert from the TV or the Echo:
-- `call_family` notifies the caregiver ("Mom chose Call Priya").
+- `call_family` notifies the caregiver ("Mom chose Call Meera").
 - `known_person` closes the alert and offers to add the visitor as an expected visit.
 - `dismiss` closes the alert.
 
@@ -147,7 +147,7 @@ Auth follows the Alexa+ two-tier model:
 ## 7. Privacy rules (enforced in code, shown in the UI)
 
 1. **The resident owns the switch.** Consent and the privacy hour are set only on Asha's TV, or by her own voice.
-2. **Signals, not streams.** The caregiver sees events ("unexpected visitor 2:41 p.m., Pause shown, Mom chose Call Priya"). They never see transcripts, frames or video.
+2. **Signals, not streams.** The caregiver sees events ("unexpected visitor 2:41 p.m., Pause shown, Mom chose Call Meera"). They never see transcripts, frames or video.
 3. **No stored check text.** "Is this legit?" stores categories and level only. Reminders keep their text, because the reminder is the point.
 4. **No faces, no plates, no identity.** Perception returns presence, count, carried objects and a neutral description. Frames are discarded after perception.
 5. **Advise, never control.** Kinwise never locks doors or calls police. Every card can be dismissed with one press.

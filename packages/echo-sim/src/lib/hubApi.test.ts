@@ -47,12 +47,12 @@ describe('notices', () => {
     expect(
       parseNotices({
         notices: [
-          { caregiverName: 'Priya', kind: 'pause', title: 'Pause shown', body: 'Unexpected visitor', at: '2026-10-05T14:41:00Z' },
+          { caregiverName: 'Meera', kind: 'pause', title: 'Pause shown', body: 'Unexpected visitor', at: '2026-10-05T14:41:00Z' },
           { title: 5 },
           null,
         ],
       }),
-    ).toEqual([{ caregiverName: 'Priya', kind: 'pause', title: 'Pause shown', body: 'Unexpected visitor', at: '2026-10-05T14:41:00Z' }]);
+    ).toEqual([{ caregiverName: 'Meera', kind: 'pause', title: 'Pause shown', body: 'Unexpected visitor', at: '2026-10-05T14:41:00Z' }]);
     expect(parseNotices({})).toEqual([]);
   });
 

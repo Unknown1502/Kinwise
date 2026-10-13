@@ -6,23 +6,23 @@ import { noticeKey, type Notice } from '../lib/hubApi';
 const KIND_ICON: Record<string, string> = { pause: '⏸', call_request: '📞', risk_high: '!' };
 const KIND_LABEL: Record<string, string> = { pause: 'Pause shown', call_request: 'Call request', risk_high: 'Warning signs' };
 
-/** "Priya's phone": the caregiver's notifications (polls the hub's dev outbox). */
+/** "Meera's phone": the caregiver's notifications (polls the hub's dev outbox). */
 export function PhonePanel({ hubUrl, token }: { hubUrl: string; token?: string }) {
   const state = useNotices(hubUrl, token, 2000);
   if (state?.status === 'unavailable') return null; // dev route absent → hide
   const notices: Notice[] = state?.status === 'ok' ? state.notices : [];
   return (
-    <section className="phone" aria-label="Priya's phone (simulated notifications)">
+    <section className="phone" aria-label="Meera's phone (simulated notifications)">
       <div className="phone-notch" aria-hidden="true" />
       <header className="phone-head">
-        <span className="phone-title">Priya's phone</span>
+        <span className="phone-title">Meera's phone</span>
         <span className="phone-sub">Kinwise notifications · dev view</span>
       </header>
       <div className="phone-body" aria-live="polite">
         {state === undefined && <p className="phone-empty">Connecting…</p>}
         {state?.status === 'offline' && <p className="phone-empty">Hub offline — notifications will appear when it's back.</p>}
         {state?.status === 'ok' && notices.length === 0 && (
-          <p className="phone-empty">No alerts. Kinwise only sends Priya signals — never recordings or transcripts.</p>
+          <p className="phone-empty">No alerts. Kinwise only sends Meera signals — never recordings or transcripts.</p>
         )}
         <ol className="notices">
           {notices.map((n) => (

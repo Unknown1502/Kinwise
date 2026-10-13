@@ -9,7 +9,7 @@ The simulator shows what Kinwise looks like on an Alexa+ smart display: you spea
 | Orchestrator | `POST {hub}/sim/ask` → the Kinwise concierge (Strands agent, or the offline router) calls Kinwise tools over MCP | The reply's meta line ("1 Kinwise tool via MCP · Claude Haiku 4.5"). The **Concierge tool calls** tab lists each tool's name, arguments, result, `isError` and latency. |
 | **Real MCP client** | One `@modelcontextprotocol/client` `Client` per persona, using `StreamableHTTPClientTransport` against `POST {hub}/mcp` with that persona's bearer token. It negotiates protocol **2025-11-25**. | The `MCP 2025-11-25` pill. The **MCP wire traffic** tab logs every JSON-RPC exchange (`initialize`, `tools/list`, `resources/read`, `tools/call`) with HTTP status, the hub's `server-timing`, the round trip, and the request and response JSON (SSE `data:` events are parsed). |
 | **Real MCP Apps host** | For every tool call with a `ui://kinwise/*` resource, the simulator calls `resources/read` for the card HTML (`text/html;profile=mcp-app`). It renders the card in `<iframe sandbox="allow-scripts allow-forms" srcdoc>` and drives it with `AppBridge` + `PostMessageTransport` from `@modelcontextprotocol/ext-apps`, sending `ui/initialize`, then `tool-input`, then `tool-result`. | The cards themselves. The bridge rows in the wire tab (`card → host ui/initialize`, `host → card ui/notifications/tool-result`). |
-| Card → server | A card button (for example **Call Priya** on the Pause) calls `App.callServerTool`. AppBridge forwards it through our MCP client to the hub, and the card re-renders from the result. Alexa reads the outcome aloud. | The wire tab shows `card → host tools/call kinwise_respond_to_alert (forwarded to the hub by AppBridge)` next to the real `POST tools/call`. Priya's phone gets the notice. |
+| Card → server | A card button (for example **Call Meera** on the Pause) calls `App.callServerTool`. AppBridge forwards it through our MCP client to the hub, and the card re-renders from the result. Alexa reads the outcome aloud. | The wire tab shows `card → host tools/call kinwise_respond_to_alert (forwarded to the hub by AppBridge)` next to the real `POST tools/call`. Meera's phone gets the notice. |
 
 When the simulator receives a tool call without `uiResourceUri`, it reads the tool's `_meta.ui.resourceUri` from `tools/list`, which is how a real host discovers card UIs.
 
@@ -45,7 +45,7 @@ Use Chrome or Edge for the microphone (Web Speech API). Text input and chips wor
 |---|---|---|
 | `VITE_HUB_URL` | `http://localhost:8787` | Hub base URL |
 | `VITE_ASHA_TOKEN` | `dev-asha` | Bearer token for Asha's kitchen Echo Show (resident) |
-| `VITE_PRIYA_TOKEN` | `dev-priya` | Bearer token for Priya's Echo Show (caregiver) |
+| `VITE_PRIYA_TOKEN` | `dev-priya` | Bearer token for Meera's Echo Show (caregiver) |
 
 Copy `.env.example` to `.env.local` to override these. Each persona keeps its own concierge `sessionId`, transcript, cards and MCP client.
 
@@ -59,7 +59,7 @@ If the hub is down, the token is rejected (401/403), the concierge is not config
 
 ## Dev aids (not part of the simulated device)
 
-- **Priya's phone** polls `GET {hub}/dev/notices` every 2 s and shows the caregiver's notifications. The panel hides itself if the route returns 404.
+- **Meera's phone** polls `GET {hub}/dev/notices` every 2 s and shows the caregiver's notifications. The panel hides itself if the route returns 404.
 - **Demo controls:**
   - **Reset demo** calls `POST /dev/reset` and clears local transcripts, cards and logs.
   - **Ring the doorbell** calls `POST /dev/visitor`. The "Person visible" toggle sets whether a person is at the door. "Show the alert on Asha's Echo" rings a banner on Asha's screen and shows the alert card through her own MCP client (`kinwise_explain_last_alert`).
@@ -70,12 +70,12 @@ If the hub is down, the token is rejected (401/403), the concierge is not config
 **Asha's kitchen Echo Show:**
 
 1. "Remind me at 2 PM: courier from the bank is picking up a package". A reminder card appears with *Some warning signs*.
-2. "A man from the FTC called… a courier will come, and I shouldn't tell my family. Is that real?" The card shows *Strong scam warning signs* and Alexa offers to call Priya.
-3. Click **Ring the doorbell**. The TV shows the Pause, and Priya's phone shows a notice.
-4. "Why did my TV pause?" The Pause card appears. Press **Call Priya** on the card. Alexa says "Calling Priya now." and Priya's phone shows *Asha wants to talk to you now*.
+2. "A man from the FTC called… a courier will come, and I shouldn't tell my family. Is that real?" The card shows *Strong scam warning signs* and Alexa offers to call Meera.
+3. Click **Ring the doorbell**. The TV shows the Pause, and Meera's phone shows a notice.
+4. "Why did my TV pause?" The Pause card appears. Press **Call Meera** on the card. Alexa says "Calling Meera now." and Meera's phone shows *Asha wants to talk to you now*.
 5. "What's happening today?" and "Give me an hour of privacy".
 
-**Priya's Echo Show:**
+**Meera's Echo Show:**
 
 1. "How's Mom's day going?" A timeline card appears. It shows signals only.
 2. "Why did Kinwise alert?"

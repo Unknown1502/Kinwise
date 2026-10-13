@@ -13,7 +13,7 @@ import { MemoryStore } from '../src/store/memory.js';
 
 const HH = DEMO_HOUSEHOLD_ID;
 const asha: Identity = { userId: 'asha', householdId: HH, role: 'resident', name: 'Asha', scopes: [] };
-const priya: Identity = { userId: 'priya', householdId: HH, role: 'caregiver', name: 'Priya', scopes: [] };
+const priya: Identity = { userId: 'priya', householdId: HH, role: 'caregiver', name: 'Meera', scopes: [] };
 const tv: Identity = { userId: 'tv-living-room', householdId: HH, role: 'device', name: 'Living room TV', scopes: [] };
 
 // Thursday 2026-10-08 in New York (UTC-4).

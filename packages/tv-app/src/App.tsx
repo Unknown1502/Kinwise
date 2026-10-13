@@ -121,7 +121,7 @@ export function App({client: injected}: AppProps = {}) {
   const state = hub.state;
   const selection = state ? selectScreen(state, {hiddenAlertIds: hidden}) : undefined;
 
-  // The TV talks: say what changed, wherever it came from (remote, Alexa, Priya's phone, the doorbell).
+  // The TV talks: say what changed, wherever it came from (remote, Alexa, Meera's phone, the doorbell).
   const spokenRef = useRef<TvStateView | undefined>(undefined);
   useEffect(() => {
     if (!state) return;

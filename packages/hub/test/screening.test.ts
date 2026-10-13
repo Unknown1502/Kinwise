@@ -40,7 +40,7 @@ describe('screen — single categories', () => {
       'remind me to pick up groceries at 5',
       'my daughter is visiting on Sunday',
       'what is the weather today',
-      'call Priya',
+      'call Meera',
       'add milk to the shopping list',
     ]) {
       expect(screen(text)).toEqual({ level: 'none', categories: [] });

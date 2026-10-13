@@ -46,8 +46,8 @@ describe('speech links', () => {
   const now = Date.parse('2026-10-08T12:00:00Z');
 
   it('round-trips the text inside a signed token', () => {
-    const token = signSpeech(key, 'Calling Priya now.', now);
-    expect(verifySpeech(key, token, now + 60_000)).toBe('Calling Priya now.');
+    const token = signSpeech(key, 'Calling Meera now.', now);
+    expect(verifySpeech(key, token, now + 60_000)).toBe('Calling Meera now.');
   });
 
   it('rejects tampered, foreign, malformed and expired tokens', () => {
@@ -133,16 +133,16 @@ describe('Alexa → TV: kinwise_read_on_tv', () => {
 
     const tv = await (await app.fetch(new Request('http://kinwise.test/tv/state', { headers: { authorization: 'Bearer dev-tv' } }))).json();
     expect(tv.cue).toMatchObject({ topic: 'messages' });
-    expect(tv.cue.text).toMatch(/Priya, at .*: Dinner at 6\?/);
+    expect(tv.cue.text).toMatch(/Meera, at .*: Dinner at 6\?/);
   });
 });
 
 describe('spoken summaries', () => {
   it('reads messages newest first, at most three', () => {
-    const m = (n: number) => ({ id: `m${n}`, from: 'Priya', text: `Note ${n}`, timeLabel: `${n}:00 PM`, unread: true });
+    const m = (n: number) => ({ id: `m${n}`, from: 'Meera', text: `Note ${n}`, timeLabel: `${n}:00 PM`, unread: true });
     expect(spokenMessages({ messages: [] })).toBe('There are no messages from family today.');
-    expect(spokenMessages({ messages: [m(1)] })).toBe('You have one message. Priya, at 1:00 PM: Note 1');
-    expect(spokenMessages({ messages: [m(4), m(3), m(2), m(1)] })).toMatch(/^You have 4 messages\. Here are the latest 3\. Priya, at 4:00 PM: Note 4/);
+    expect(spokenMessages({ messages: [m(1)] })).toBe('You have one message. Meera, at 1:00 PM: Note 1');
+    expect(spokenMessages({ messages: [m(4), m(3), m(2), m(1)] })).toMatch(/^You have 4 messages\. Here are the latest 3\. Meera, at 4:00 PM: Note 4/);
   });
 
   it('reads the day as visits, then reminders', () => {

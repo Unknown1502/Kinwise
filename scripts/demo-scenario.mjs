@@ -45,7 +45,7 @@ const steps = [
     '14:41 — A stranger rings the doorbell (the TV should show the Pause now)',
     async () => console.log('   🚪', JSON.stringify(await post('/dev/visitor', { description: 'A person at the front door holding a small box', carrying: 'a small box' }, ASHA))),
   ],
-  ['Priya checks in', () => ask(PRIYA, "How's Mom's day going?")],
+  ['Meera checks in', () => ask(PRIYA, "How's Mom's day going?")],
 ];
 
 for (const [i, [title, fn]] of steps.entries()) {

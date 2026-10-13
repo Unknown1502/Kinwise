@@ -98,7 +98,7 @@ describe('MCP server over Streamable HTTP', () => {
       arguments: { description: 'The bank fraud department says a courier will pick up my gold. Do not tell anyone.' },
     });
     expect(r.isError).toBeFalsy();
-    expect(r.structuredContent).toMatchObject({ mode: 'check', level: 'high', caregiverName: 'Priya' });
+    expect(r.structuredContent).toMatchObject({ mode: 'check', level: 'high', caregiverName: 'Meera' });
     expect((r.content as any[])[0].text).toMatch(/warning signs of a scam/);
   });
 
@@ -250,7 +250,7 @@ describe('Fire TV API', () => {
     const res = await app.fetch(new Request('http://kinwise.test/tv/state', { headers: { authorization: 'Bearer dev-tv' } }));
     const body = await res.json();
     expect(body.resident.name).toBe('Asha');
-    expect(body.caregiver).toMatchObject({ name: 'Priya', relationship: 'daughter' });
+    expect(body.caregiver).toMatchObject({ name: 'Meera', relationship: 'daughter' });
   });
 
   it('stops caregivers from changing the resident’s consent', async () => {

@@ -2,7 +2,7 @@ import type {AlertView, TvStateView} from '../types';
 
 /**
  * What the TV says aloud when the hub state changes, wherever the change came from: the remote,
- * Alexa, Priya's phone or the Ring doorbell. Pure, so it is unit-tested.
+ * Alexa, Meera's phone or the Ring doorbell. Pure, so it is unit-tested.
  *
  * On the very first state only an alert already on screen is announced; everything else is news
  * only when it changes while the TV is on.

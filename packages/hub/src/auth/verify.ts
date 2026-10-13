@@ -29,7 +29,7 @@ export class StaticTokenVerifier implements TokenVerifier {
 export function devTokens(householdId: string): Record<string, Identity> {
   return {
     'dev-asha': { userId: 'asha', householdId, role: 'resident', name: 'Asha', scopes: [...ALL_MCP_SCOPES] },
-    'dev-priya': { userId: 'priya', householdId, role: 'caregiver', name: 'Priya', scopes: [...ALL_MCP_SCOPES] },
+    'dev-priya': { userId: 'priya', householdId, role: 'caregiver', name: 'Meera', scopes: [...ALL_MCP_SCOPES] },
     // Discovery-only service token, like Alexa+'s client_credentials tier.
     'dev-service': { userId: 'alexa-service', householdId, role: 'service', name: 'Alexa+ (service)', scopes: [SCOPES.service] },
     'dev-tv': { userId: 'tv-living-room', householdId, role: 'device', name: 'Living room TV', scopes: [] },

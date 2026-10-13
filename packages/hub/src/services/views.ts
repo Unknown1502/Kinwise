@@ -161,7 +161,7 @@ export function activeAlert(state: HouseholdState): Alert | undefined {
     .sort((a, b) => ALERT_PRIORITY[a.kind] - ALERT_PRIORITY[b.kind] || Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
 }
 
-/** "You have 2 messages. Priya, at 1:02 PM: Love you Mom!…": family notes, as the TV reads them aloud. */
+/** "You have 2 messages. Meera, at 1:02 PM: Love you Mom!…": family notes, as the TV reads them aloud. */
 export function spokenMessages(v: Pick<TodayView, 'messages'>): string {
   const latest = v.messages.slice(0, 3);
   if (latest.length === 0) return 'There are no messages from family today.';

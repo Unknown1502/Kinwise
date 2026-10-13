@@ -28,7 +28,7 @@ export function deriveDemoToken(seed: string, persona: 'asha' | 'priya' | 'tv'):
 export function demoTokenIdentities(seed: string, householdId: string): Record<string, Identity> {
   return {
     [deriveDemoToken(seed, 'asha')]: { userId: 'asha', householdId, role: 'resident', name: 'Asha', scopes: [...ALL_MCP_SCOPES] },
-    [deriveDemoToken(seed, 'priya')]: { userId: 'priya', householdId, role: 'caregiver', name: 'Priya', scopes: [...ALL_MCP_SCOPES] },
+    [deriveDemoToken(seed, 'priya')]: { userId: 'priya', householdId, role: 'caregiver', name: 'Meera', scopes: [...ALL_MCP_SCOPES] },
     [deriveDemoToken(seed, 'tv')]: { userId: 'tv-living-room', householdId, role: 'device', name: 'Living room TV', scopes: [] },
   };
 }

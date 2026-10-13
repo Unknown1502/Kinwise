@@ -30,7 +30,7 @@ function fakeHub(initial: TvStateView) {
       state = withAlert(state, undefined);
       const message =
         body.action === 'call_family'
-          ? 'Calling Priya now.'
+          ? 'Calling Meera now.'
           : body.action === 'known_person'
             ? 'Okay. You can add them as an expected visitor so I remember next time.'
             : 'Okay, I closed the alert.';
@@ -119,7 +119,7 @@ describe('home screen', () => {
     expect(screen.getAllByText('Kinwise checked this one')).toHaveLength(1);
     expect(screen.getByText('“Love you Mom! Call you tonight.”')).toBeTruthy();
     expect(screen.getByText('New')).toBeTruthy();
-    expect(screen.getByText('Priya, 9:15 AM')).toBeTruthy();
+    expect(screen.getByText('Meera, 9:15 AM')).toBeTruthy();
     expect(screen.getByText('Privacy time for an hour')).toBeTruthy();
     expect(screen.getByText('Settings & privacy')).toBeTruthy();
   });
@@ -136,7 +136,7 @@ describe('home screen', () => {
       expect(el.getAttribute('role'), el.getAttribute('aria-label') ?? '').toBeTruthy();
     });
     // Spatial navigation assigns the initial focus just after mount.
-    await vi.waitFor(() => expect(isFocused('New message from Priya, 1:02 PM: Love you Mom! Call you tonight.')).toBe(true));
+    await vi.waitFor(() => expect(isFocused('New message from Meera, 1:02 PM: Love you Mom! Call you tonight.')).toBe(true));
   });
 
   it('marks a message read when selected', async () => {
@@ -173,7 +173,7 @@ describe('home screen', () => {
     const hub = fakeHub({
       ...s,
       today: {...s.today, messages: [], safety: {level: 'high', untilLabel: '8:18 PM', signs: []}},
-      pendingProposals: [{id: 'visit_9', label: 'Sam (plumber)', when: 'Oct 7 9:00 AM–10:00 AM', proposedBy: 'Priya'}],
+      pendingProposals: [{id: 'visit_9', label: 'Sam (plumber)', when: 'Oct 7 9:00 AM–10:00 AM', proposedBy: 'Meera'}],
     });
     render(<App client={hub.client} />);
     await screen.findByTestId('home-screen');
@@ -182,7 +182,7 @@ describe('home screen', () => {
     expect(await screen.findByTestId('settings-screen')).toBeTruthy();
     expect(screen.getByText('What Kinwise may notice')).toBeTruthy();
     expect(screen.getByText('Sam (plumber), Oct 7 9:00 AM–10:00 AM')).toBeTruthy();
-    expect(screen.getByText('Priya viewed today\'s overview')).toBeTruthy();
+    expect(screen.getByText('Meera viewed today\'s overview')).toBeTruthy();
     expect(screen.getByText('End safety watch')).toBeTruthy();
     expect(screen.getAllByRole('switch')).toHaveLength(5);  // four consent switches + Read things aloud
     press('Escape');
@@ -191,7 +191,7 @@ describe('home screen', () => {
 });
 
 describe('the Pause', () => {
-  it('takes over the screen, announces itself and focuses "Call Priya"', async () => {
+  it('takes over the screen, announces itself and focuses "Call Meera"', async () => {
     const said = collectAnnouncements();
     const hub = fakeHub(withAlert(homeState(), pauseAlert()));
     render(<App client={hub.client} />);
@@ -203,10 +203,10 @@ describe('the Pause', () => {
     ).toBeTruthy();
     expect(within(pause).getByText('Bank or agency')).toBeTruthy();
     expect(within(pause).getByText('Someone coming to collect')).toBeTruthy();
-    expect(within(pause).getByText('A message from Priya')).toBeTruthy();
+    expect(within(pause).getByText('A message from Meera')).toBeTruthy();
     expect(within(pause).getByText(/Real banks and agencies never send couriers/)).toBeTruthy();
     expect(screen.queryByTestId('home-screen')).toBeNull();
-    await focusOn('Call Priya');
+    await focusOn('Call Meera');
     expect(said.said.some((t) => t.startsWith('Pause before you open the door.'))).toBe(true);
     said.stop();
   });
@@ -216,20 +216,20 @@ describe('the Pause', () => {
     render(<App client={hub.client} />);
     await screen.findByTestId('pause-screen');
     expect(screen.getByText(/Real agencies never ask you to move money/)).toBeTruthy();
-    await focusOn('Call Priya');
+    await focusOn('Call Meera');
     press('ArrowUp');
     press('ArrowRight');
     expect(isFocused('Warning sign: Pressure to act now')).toBe(true);
     expect(screen.getByText(/Pressure to act fast is the most common scam warning sign/)).toBeTruthy();
   });
 
-  it('Call Priya → responds call_family and confirms "Calling Priya now…"', async () => {
+  it('Call Meera → responds call_family and confirms "Calling Meera now…"', async () => {
     const hub = fakeHub(withAlert(homeState(), pauseAlert()));
     render(<App client={hub.client} />);
     await screen.findByTestId('pause-screen');
-    await focusOn('Call Priya');
+    await focusOn('Call Meera');
     press('Enter');
-    expect(await screen.findByText('Calling Priya now…')).toBeTruthy();
+    expect(await screen.findByText('Calling Meera now…')).toBeTruthy();
     expect(hub.posts).toContainEqual({path: '/tv/alerts/alert_pause_1/respond', body: {action: 'call_family'}});
   });
 
@@ -241,9 +241,9 @@ describe('the Pause', () => {
     await screen.findByTestId('home-screen');
     hub.set(withAlert(calm, pauseAlert()));
     await screen.findByTestId('pause-screen', undefined, {timeout: 4000});
-    await focusOn('Call Priya');
+    await focusOn('Call Meera');
     press('Enter');
-    await screen.findByText('Calling Priya now…');
+    await screen.findByText('Calling Meera now…');
     expect(await screen.findByTestId('home-screen', undefined, {timeout: 7000})).toBeTruthy();
     await focusOn('Settings & privacy');
     press('Enter');
@@ -254,7 +254,7 @@ describe('the Pause', () => {
     const hub = fakeHub(withAlert(homeState(), pauseAlert()));
     render(<App client={hub.client} />);
     await screen.findByTestId('pause-screen');
-    await focusOn('Call Priya');
+    await focusOn('Call Meera');
     press('ArrowRight');
     expect(isFocused('I know this person')).toBe(true);
     press('Enter');
@@ -314,7 +314,7 @@ describe('the TV talks', () => {
     await screen.findByTestId('pause-screen');
     await vi.waitFor(() =>
       expect(spoken(hub.posts)).toEqual([
-        'Asha, someone is at your door, and no visit is expected right now. Please pause before you open it. Press OK to call Priya.',
+        'Asha, someone is at your door, and no visit is expected right now. Please pause before you open it. Press OK to call Meera.',
       ]),
     );
   });
@@ -323,10 +323,10 @@ describe('the TV talks', () => {
     const hub = fakeHub(withAlert(homeState(), pauseAlert()));
     render(<App client={hub.client} />);
     await screen.findByTestId('pause-screen');
-    await focusOn('Call Priya');
+    await focusOn('Call Meera');
     press('Enter');
-    await screen.findByText('Calling Priya now…');
-    await vi.waitFor(() => expect(spoken(hub.posts)).toContain("Calling Priya now. You don't need to open the door."));
+    await screen.findByText('Calling Meera now…');
+    await vi.waitFor(() => expect(spoken(hub.posts)).toContain("Calling Meera now. You don't need to open the door."));
   });
 
   it('reads aloud what Alexa sends to the TV, and new messages', async () => {
@@ -336,12 +336,12 @@ describe('the TV talks', () => {
     await screen.findByTestId('home-screen');
     hub.set({
       ...s,
-      cue: {id: 'cue_1', topic: 'messages', text: 'You have one message. Priya, at 1:02 PM: Love you Mom!'},
-      today: {...s.today, messages: [{id: 'msg_new', from: 'Priya', text: 'On my way.', timeLabel: '2:20 PM', unread: true}, ...s.today.messages]},
+      cue: {id: 'cue_1', topic: 'messages', text: 'You have one message. Meera, at 1:02 PM: Love you Mom!'},
+      today: {...s.today, messages: [{id: 'msg_new', from: 'Meera', text: 'On my way.', timeLabel: '2:20 PM', unread: true}, ...s.today.messages]},
     });
     expect(await screen.findByText('Reading your messages aloud.', undefined, {timeout: 4000})).toBeTruthy();
     await vi.waitFor(() =>
-      expect(spoken(hub.posts)).toEqual(['New message from Priya: On my way.', 'You have one message. Priya, at 1:02 PM: Love you Mom!']),
+      expect(spoken(hub.posts)).toEqual(['New message from Meera: On my way.', 'You have one message. Meera, at 1:02 PM: Love you Mom!']),
     );
   });
 
@@ -378,7 +378,7 @@ describe('onboarding', () => {
     press('ArrowRight'); // Next
     press('Enter');
 
-    expect(await screen.findByText('Priya sees signals, never recordings')).toBeTruthy();
+    expect(await screen.findByText('Meera sees signals, never recordings')).toBeTruthy();
     await focusOn('Finish');
     press('Enter');
     await vi.waitFor(() =>

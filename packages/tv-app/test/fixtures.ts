@@ -2,7 +2,7 @@ import type {AlertView, SignView, TvStateView} from '../src/types';
 
 /**
  * Fixtures shaped exactly like the hub's GET /tv/state (TvStateView), captured from a running
- * hub with the demo household (Asha, caregiver Priya) and trimmed.
+ * hub with the demo household (Asha, caregiver Meera) and trimmed.
  */
 
 export const SIGNS: SignView[] = [
@@ -33,9 +33,9 @@ export function pauseAlert(overrides: Partial<AlertView> = {}): AlertView {
     description: 'A person at the front door holding a small box',
     riskLevel: 'high',
     signs: SIGNS,
-    caregiverName: 'Priya',
+    caregiverName: 'Meera',
     pauseMessage: {
-      from: 'Priya',
+      from: 'Meera',
       text: "Mom, it's me. Real banks and agencies never send couriers. Please don't hand anything over. I'm calling you right now.",
       videoUrl: '/media/priya-pause.mp4',
     },
@@ -52,7 +52,7 @@ export function gentleAlert(overrides: Partial<AlertView> = {}): AlertView {
     createdLabel: '2:30 PM',
     description: 'A person at the front door',
     signs: [],
-    caregiverName: 'Priya',
+    caregiverName: 'Meera',
     ...overrides,
   };
 }
@@ -67,7 +67,7 @@ export function expectedAlert(overrides: Partial<AlertView> = {}): AlertView {
     description: 'A person at the front door',
     visitLabel: 'Luis (gardener)',
     signs: [],
-    caregiverName: 'Priya',
+    caregiverName: 'Meera',
     ...overrides,
   };
 }
@@ -77,11 +77,11 @@ export function homeState(overrides: Partial<TvStateView> = {}): TvStateView {
   const base: TvStateView = {
     household: {id: 'hh-asha', name: "Asha's home", timezone: 'America/New_York'},
     resident: {id: 'asha', name: 'Asha'},
-    caregiver: {name: 'Priya', relationship: 'daughter'},
+    caregiver: {name: 'Meera', relationship: 'daughter'},
     today: {
       householdName: "Asha's home",
       residentName: 'Asha',
-      caregiverName: 'Priya',
+      caregiverName: 'Meera',
       date: '2026-10-05',
       dateLabel: 'Monday, October 5',
       timeLabel: '2:19 PM',
@@ -91,8 +91,8 @@ export function homeState(overrides: Partial<TvStateView> = {}): TvStateView {
       ],
       visits: [{id: 'visit_aide', label: 'Maria (home-health aide)', timeLabel: '2:00 PM–3:00 PM'}],
       messages: [
-        {id: 'msg_1', from: 'Priya', text: 'Love you Mom! Call you tonight.', timeLabel: '1:02 PM', unread: true},
-        {id: 'msg_2', from: 'Priya', text: 'Luis is coming Thursday as usual.', timeLabel: '9:15 AM', unread: false},
+        {id: 'msg_1', from: 'Meera', text: 'Love you Mom! Call you tonight.', timeLabel: '1:02 PM', unread: true},
+        {id: 'msg_2', from: 'Meera', text: 'Luis is coming Thursday as usual.', timeLabel: '9:15 AM', unread: false},
       ],
       safety: {level: 'none', signs: []},
     },
@@ -104,7 +104,7 @@ export function homeState(overrides: Partial<TvStateView> = {}): TvStateView {
       shareTimelineWithCaregiver: true,
       onboardedAt: '2026-10-05T12:00:00.000Z',
     },
-    accessLog: [{timeLabel: '1:05 PM', actor: 'Priya', action: "viewed today's overview"}],
+    accessLog: [{timeLabel: '1:05 PM', actor: 'Meera', action: "viewed today's overview"}],
     serverTime: '2026-10-05T18:19:11.527Z',
   };
   return {...base, ...overrides};

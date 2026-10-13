@@ -6,14 +6,14 @@ describe('narration', () => {
   it('stays quiet on the first state unless an alert is on screen', () => {
     expect(narration(undefined, homeState())).toEqual([]);
     expect(narration(undefined, withAlert(homeState(), pauseAlert()))).toEqual([
-      'Asha, someone is at your door, and no visit is expected right now. Please pause before you open it. Press OK to call Priya.',
+      'Asha, someone is at your door, and no visit is expected right now. Please pause before you open it. Press OK to call Meera.',
     ]);
   });
 
   it('says where the Pause warning came from, when known', () => {
     const alert = pauseAlert({because: 'At 10:20 AM you asked Kinwise about a call, and it matched courier-scam warning signs.'});
     expect(alertLine(alert, 'Asha')).toBe(
-      'Asha, someone is at your door, and no visit is expected right now. At 10:20 AM you asked Kinwise about a call, and it matched courier-scam warning signs. Please pause before you open it. Press OK to call Priya.',
+      'Asha, someone is at your door, and no visit is expected right now. At 10:20 AM you asked Kinwise about a call, and it matched courier-scam warning signs. Please pause before you open it. Press OK to call Meera.',
     );
   });
 
@@ -26,9 +26,9 @@ describe('narration', () => {
 
   it('reads new family messages, oldest first', () => {
     const before = homeState();
-    const m = (id: string, text: string) => ({id, from: 'Priya', text, timeLabel: '2:30 PM', unread: true});
+    const m = (id: string, text: string) => ({id, from: 'Meera', text, timeLabel: '2:30 PM', unread: true});
     const after = homeState({today: {...before.today, messages: [m('n2', 'Second'), m('n1', 'First'), ...before.today.messages]}});
-    expect(narration(before, after)).toEqual(['New message from Priya: First', 'New message from Priya: Second']);
+    expect(narration(before, after)).toEqual(['New message from Meera: First', 'New message from Meera: Second']);
   });
 
   it('says when privacy time starts and ends', () => {
@@ -55,6 +55,6 @@ describe('narration', () => {
 
   it('words each kind of visitor and the call plainly', () => {
     expect(alertLine(expectedAlert(), 'Asha')).toBe("Luis (gardener) is at the door. They're on today's list.");
-    expect(callingLine('Priya')).toBe("Calling Priya now. You don't need to open the door.");
+    expect(callingLine('Meera')).toBe("Calling Meera now. You don't need to open the door.");
   });
 });

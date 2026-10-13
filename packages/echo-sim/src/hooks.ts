@@ -271,7 +271,7 @@ export function useWakeWord(onCommand: (text: string) => void, paused: boolean):
   return { supported, on, state, heard, error, setOn };
 }
 
-/** Poll {hub}/dev/notices every `ms` ("Priya's phone"). */
+/** Poll {hub}/dev/notices every `ms` ("Meera's phone"). */
 export function useNotices(hubUrl: string, token?: string, ms = 2000): NoticesOutcome | undefined {
   const [state, setState] = useState<NoticesOutcome | undefined>(undefined);
   useEffect(() => {

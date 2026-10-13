@@ -139,8 +139,8 @@ With the hub running (`npm run dev:hub` at the repo root):
 curl -X POST http://<hub>:8787/dev/visitor -H 'content-type: application/json' -d '{}'
 ```
 
-The Pause takes over the TV within one poll (≤ 2 s). **Call Priya** has focus. VoiceView reads the
-Pause aloud, and selecting **Call Priya** notifies the caregiver.
+The Pause takes over the TV within one poll (≤ 2 s). **Call Meera** has focus. VoiceView reads the
+Pause aloud, and selecting **Call Meera** notifies the caregiver.
 
 ## Accessibility and 10-foot rules (enforced in code)
 
@@ -162,9 +162,9 @@ Pause aloud, and selecting **Call Priya** notifies the caregiver.
 
 ## Voice
 
-The TV says what changed, wherever the change came from (the remote, Alexa, Priya's phone or the
+The TV says what changed, wherever the change came from (the remote, Alexa, Meera's phone or the
 Ring doorbell): the Pause and other visitors at the door, new family notes, privacy time starting
-and ending, the safety watch, the "Calling Priya" confirmation, and anything Alexa asks the TV to
+and ending, the safety watch, the "Calling Meera" confirmation, and anything Alexa asks the TV to
 read (`kinwise_read_on_tv`). `src/logic/narration.ts` decides the words (unit-tested);
 `src/voice/useVoice.ts` fetches each line from the hub as natural speech (Amazon Polly) and plays
 it with Vega's `AudioPlayer` (`src/voice/player.vega.ts`) or an `<audio>` element in the preview.

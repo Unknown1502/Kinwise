@@ -45,7 +45,7 @@ Context options: `authDomainPrefix`, `callbackUrls`, `allowedOrigins`, `caregive
 ## After deploying
 
 ```bash
-node ../scripts/demo-tokens.mjs        # prints the hub URL plus Asha / Priya / TV demo tokens
+node ../scripts/demo-tokens.mjs        # prints the hub URL plus Asha / Meera / TV demo tokens
 ```
 
 Point the local front ends at the hosted hub:

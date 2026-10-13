@@ -73,8 +73,8 @@ export function loadConfig(env: EnvLike): SimConfig {
       },
       priya: {
         id: 'priya',
-        deviceName: "Priya's Echo Show",
-        personName: 'Priya',
+        deviceName: "Meera's Echo Show",
+        personName: 'Meera',
         role: 'caregiver',
         token: str(env, 'VITE_PRIYA_TOKEN', 'dev-priya'),
         suggestions: PRIYA_SUGGESTIONS,

@@ -4,7 +4,7 @@ export const DEMO_HOUSEHOLD_ID = 'hh-asha';
 
 /**
  * Demo household used by local dev, tests and the video. Asha lives alone;
- * Priya is her daughter. Weekdays: 0 = Sunday … 6 = Saturday.
+ * Meera is her daughter. Weekdays: 0 = Sunday … 6 = Saturday.
  */
 export function demoHousehold(now: Date, timezone = 'America/New_York', pauseVideoUrl?: string): HouseholdState {
   const iso = now.toISOString();
@@ -16,10 +16,10 @@ export function demoHousehold(now: Date, timezone = 'America/New_York', pauseVid
       timezone,
       members: [
         { id: 'asha', name: 'Asha', role: 'resident' },
-        { id: 'priya', name: 'Priya', role: 'caregiver', relationship: 'daughter' },
+        { id: 'priya', name: 'Meera', role: 'caregiver', relationship: 'daughter' },
       ],
       pauseMessage: {
-        from: 'Priya',
+        from: 'Meera',
         text: "Mom, it's me. Real banks and agencies never send couriers. Please don't hand anything over. I'm calling you right now.",
         // Record a short consented clip and set DEMO_PAUSE_VIDEO_URL; without it the TV shows captions only.
         ...(pauseVideoUrl ? { videoUrl: pauseVideoUrl } : {}),

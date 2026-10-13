@@ -18,7 +18,7 @@ export interface AppDeps {
   service: KinwiseService;
   verifier: TokenVerifier;
   concierge?: ConciergeClient;
-  /** Dev only: "Priya's phone" outbox for the demo. */
+  /** Dev only: "Meera's phone" outbox for the demo. */
   outbox?: OutboxNotifier;
   /** Dev only: reseed the demo household. */
   resetDemo?: () => Promise<void>;

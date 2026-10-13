@@ -142,7 +142,7 @@ export class KinwiseStack extends Stack {
         COGNITO_CLIENT_IDS: [alexaService, alexaLinking, echoSim].map((c) => c.userPoolClientId).join(','),
         USER_DIRECTORY: JSON.stringify({
           asha: { householdId: 'hh-asha', role: 'resident', name: 'Asha' },
-          priya: { householdId: 'hh-asha', role: 'caregiver', name: 'Priya' },
+          priya: { householdId: 'hh-asha', role: 'caregiver', name: 'Meera' },
         }),
         STORE: 'dynamo',
         TABLE_NAME: table.tableName,

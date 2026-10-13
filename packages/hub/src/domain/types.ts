@@ -20,7 +20,7 @@ export interface Member {
   id: string;
   name: string;
   role: Role;
-  /** How the resident refers to this person, e.g. "Priya (daughter)". */
+  /** How the resident refers to this person, e.g. "Meera (daughter)". */
   relationship?: string;
 }
 

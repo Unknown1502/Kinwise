@@ -6,7 +6,7 @@ describe('loadConfig', () => {
     const c = loadConfig({});
     expect(c.hubUrl).toBe(DEFAULT_HUB_URL);
     expect(c.personas.asha).toMatchObject({ token: 'dev-asha', role: 'resident', deviceName: "Asha's kitchen Echo Show" });
-    expect(c.personas.priya).toMatchObject({ token: 'dev-priya', role: 'caregiver', deviceName: "Priya's Echo Show" });
+    expect(c.personas.priya).toMatchObject({ token: 'dev-priya', role: 'caregiver', deviceName: "Meera's Echo Show" });
   });
 
   it('reads Vite env overrides', () => {

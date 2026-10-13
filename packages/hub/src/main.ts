@@ -6,7 +6,7 @@ import { loadConfig } from './config.js';
 const config = loadConfig();
 const { app } = await bootstrap(config);
 
-// Demo media (e.g. Priya's recorded Pause message) for local runs. On AWS this lives on S3/CloudFront.
+// Demo media (e.g. Meera's recorded Pause message) for local runs. On AWS this lives on S3/CloudFront.
 app.use('/media/*', serveStatic({ root: './' }));
 
 serve({ fetch: app.fetch, port: config.port, hostname: '0.0.0.0' }, (info) => {

@@ -9,7 +9,7 @@ import { MemoryStore } from '../src/store/memory.js';
 
 const HH = DEMO_HOUSEHOLD_ID;
 const asha: Identity = { userId: 'asha', householdId: HH, role: 'resident', name: 'Asha', scopes: [] };
-const priya: Identity = { userId: 'priya', householdId: HH, role: 'caregiver', name: 'Priya', scopes: [] };
+const priya: Identity = { userId: 'priya', householdId: HH, role: 'caregiver', name: 'Meera', scopes: [] };
 const tv: Identity = { userId: 'tv-living-room', householdId: HH, role: 'device', name: 'Living room TV', scopes: [] };
 
 // Thursday 2026-10-08 in New York (UTC-4).
@@ -40,7 +40,7 @@ describe('KinwiseService — hero story', () => {
     await ctx.service.createHousehold(demoHousehold(ctx.clock.now()));
   });
 
-  it('runs reminder → check → unexpected visitor → Pause → Call Priya', async () => {
+  it('runs reminder → check → unexpected visitor → Pause → Call Meera', async () => {
     const { service, clock, notifier } = ctx;
 
     // 10:15 a seemingly innocent reminder
@@ -67,22 +67,22 @@ describe('KinwiseService — hero story', () => {
 
     const state = await service.tvState(tv);
     expect(state.activeAlert?.kind).toBe('pause');
-    expect(state.activeAlert?.pauseMessage?.from).toBe('Priya');
+    expect(state.activeAlert?.pauseMessage?.from).toBe('Meera');
     expect(state.activeAlert?.signs.length).toBe(5);
     expect(notifier.outbox[0]?.kind).toBe('pause');
 
-    // She presses "Call Priya" on the remote
+    // She presses "Call Meera" on the remote
     const res = await service.respondToAlert(tv, ingest.alertId!, 'call_family');
-    expect(res.message).toBe('Calling Priya now.');
-    expect(notifier.outbox[0]).toMatchObject({ kind: 'call_request', caregiverName: 'Priya' });
+    expect(res.message).toBe('Calling Meera now.');
+    expect(notifier.outbox[0]).toMatchObject({ kind: 'call_request', caregiverName: 'Meera' });
     expect((await service.tvState(tv)).activeAlert).toBeUndefined();
 
-    // Priya's timeline shows signals, never content
+    // Meera's timeline shows signals, never content
     const tl = await service.getTimeline(priya);
     const text = tl.entries.map((e) => e.text).join('\n');
     expect(tl.summary).toMatchObject({ pausesShown: 1, unexpectedVisitors: 1, flaggedCalls: 1 });
     expect(text).not.toMatch(/FTC|gold|accounts are compromised/i);
-    expect(text).toMatch(/chose "Call Priya"/);
+    expect(text).toMatch(/chose "Call Meera"/);
     // Same-instant entries keep causal order: the visitor arrives, then the Pause is shown.
     const kinds = tl.entries.map((e) => e.kind);
     expect(kinds.indexOf('visitor_unexpected')).toBeLessThan(kinds.indexOf('pause_shown'));
@@ -180,7 +180,7 @@ describe('KinwiseService — hero story', () => {
   it('delivers family messages to the TV', async () => {
     await ctx.service.sendFamilyMessage(priya, 'Dinner on Sunday? ❤️');
     const s = await ctx.service.tvState(tv);
-    expect(s.today.messages[0]).toMatchObject({ from: 'Priya', text: 'Dinner on Sunday? ❤️', unread: true });
+    expect(s.today.messages[0]).toMatchObject({ from: 'Meera', text: 'Dinner on Sunday? ❤️', unread: true });
     await ctx.service.markMessageRead(tv, s.today.messages[0]!.id);
     expect((await ctx.service.tvState(tv)).today.messages[0]?.unread).toBe(false);
   });
