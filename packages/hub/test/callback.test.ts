@@ -306,6 +306,22 @@ describe('the confirm link under attack', () => {
     expect(await h.notesFromMeera()).toBe(1);
   });
 
+  it('an out-of-date link shows a human page on the form button, and JSON for programs', async () => {
+    const h = await app();
+    const first = await h.press();
+    await h.press(); // a newer call replaces it
+    const form = await h.call(`/ack/${link(DEMO_HOUSEHOLD_ID, first)}`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' } });
+    expect(form.status).toBe(404);
+    expect(form.headers.get('content-type')).toMatch(/text\/html/);
+    const text = await form.text();
+    expect(text).toMatch(/out of date/i);
+    expect(text).toMatch(/call .* directly/i);
+    expect(text).not.toContain('not_found');
+    const api = await h.call(`/ack/${link(DEMO_HOUSEHOLD_ID, first)}`, { method: 'POST' });
+    expect(api.status).toBe(404);
+    expect((await api.json()).error).toBe('not_found');
+  });
+
   it('a link that is expired by one second, or enormous, or full of markup, is refused cleanly (403, never 500)', async () => {
     const h = await app();
     const callId = await h.press();

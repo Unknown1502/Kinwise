@@ -247,7 +247,7 @@ export function createApp(deps: AppDeps): Hono<Env> {
 
   // ── "I'm calling now": the caregiver tells the TV she got the request ──
   const confirmKey = ackKey(config.ingestSecret);
-  const page = (c: Context, status: 200 | 403, heading: string, body: string, form?: string) =>
+  const page = (c: Context, status: 200 | 400 | 403 | 404, heading: string, body: string, form?: string) =>
     c.html(
       `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kinwise</title>` +
         `<body style="font:20px/1.5 system-ui,sans-serif;max-width:30rem;margin:12vh auto;padding:0 1.25rem;color:#0b2230"><h1 style="font-size:1.6rem">${heading}</h1><p>${body}</p>${form ?? ''}</body></html>`,
@@ -274,7 +274,16 @@ export function createApp(deps: AppDeps): Hono<Env> {
       if (wantsPage) return page(c, 403, 'This link has expired', 'Open Kinwise or call the person directly.');
       return c.json({ error: 'invalid_or_expired', error_description: 'This confirm link is invalid or has expired' }, 403);
     }
-    await service.acknowledgeCallByLink(claim.householdId, claim.callId);
+    try {
+      await service.acknowledgeCallByLink(claim.householdId, claim.callId);
+    } catch (err) {
+      // An older e-mail after a newer call, or a request over an hour old: a person taps this, so say it in words.
+      if (wantsPage && (err instanceof NotFoundError || err instanceof ValidationError)) {
+        const old = err instanceof NotFoundError;
+        return page(c, old ? 404 : 400, old ? 'This request is out of date' : 'This request has expired', 'A newer request was sent, or this one is over. Please call them directly.');
+      }
+      throw err;
+    }
     return wantsPage ? page(c, 200, 'Done', 'Their TV now says you are calling. Thank you.') : c.json({ ok: true });
   });
   // The same confirmation from a signed-in caregiver (the simulator's phone panel, a future app).
