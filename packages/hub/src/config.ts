@@ -1,5 +1,13 @@
 import { DEMO_HOUSEHOLD_ID } from './seed.js';
 
+/** Twilio WhatsApp credentials. `to` is the caregiver's own WhatsApp number, so they are personal data and live in Secrets Manager. */
+export interface WhatsAppCreds {
+  accountSid: string;
+  authToken: string;
+  from: string;
+  to: string;
+}
+
 export interface HubConfig {
   port: number;
   /** Public origin of this hub. When unset (e.g. on Lambda behind API Gateway), it is derived per request. */
@@ -21,6 +29,8 @@ export interface HubConfig {
   snsTopicArn?: string;
   /** Phone push to the caregiver through ntfy. The topic is the secret that routes the push, so it must be long. */
   ntfy?: { server: string; topic?: string; /** Secrets Manager ARN holding the topic (resolved at cold start). */ topicSecretArn?: string };
+  /** WhatsApp to the caregiver through Twilio: credentials directly (local) or a Secrets Manager ARN (hosted). */
+  whatsapp?: { creds?: WhatsAppCreds; secretArn?: string };
   allowedOrigins: string[];
   wwwAuthenticate: boolean;
   conciergeUrl?: string;
@@ -80,6 +90,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
     dataFile: env.DATA_FILE ?? '.kinwise-data/state.json',
     snsTopicArn: env.SNS_TOPIC_ARN,
     ntfy: loadNtfy(env),
+    whatsapp: loadWhatsApp(env),
     allowedOrigins: (env.ALLOWED_ORIGINS ?? 'http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174')
       .split(',')
       .map((s) => s.trim())
@@ -114,6 +125,25 @@ function loadNtfy(env: NodeJS.ProcessEnv): HubConfig['ntfy'] {
   const server = (env.NTFY_SERVER ?? 'https://ntfy.sh').replace(/\/$/, '');
   if (!server.startsWith('https://')) throw new Error('NTFY_SERVER must be an https:// URL');
   return { server, ...(topic ? { topic: checkNtfyTopic(topic) } : {}), ...(topicSecretArn ? { topicSecretArn } : {}) };
+}
+
+/** A complete, well-formed credential set, or undefined (a placeholder secret simply leaves WhatsApp off). */
+export function parseWhatsApp(raw: unknown): WhatsAppCreds | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const { accountSid, authToken, from, to } = r;
+  if (typeof accountSid !== 'string' || !/^AC[0-9a-f]{32}$/i.test(accountSid)) return undefined;
+  if (typeof authToken !== 'string' || !authToken) return undefined;
+  const number = /^whatsapp:\+\d{8,15}$/;
+  if (typeof from !== 'string' || !number.test(from) || typeof to !== 'string' || !number.test(to)) return undefined;
+  return { accountSid, authToken, from, to };
+}
+
+function loadWhatsApp(env: NodeJS.ProcessEnv): HubConfig['whatsapp'] {
+  const secretArn = env.WHATSAPP_SECRET_ARN || undefined;
+  const creds = parseWhatsApp({ accountSid: env.WHATSAPP_ACCOUNT_SID, authToken: env.WHATSAPP_AUTH_TOKEN, from: env.WHATSAPP_FROM, to: env.WHATSAPP_TO });
+  if (!secretArn && !creds) return undefined;
+  return { ...(creds ? { creds } : {}), ...(secretArn ? { secretArn } : {}) };
 }
 
 function required(env: NodeJS.ProcessEnv, key: string): string {

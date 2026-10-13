@@ -1,14 +1,14 @@
 import type { Identity } from './auth/identity.js';
 import { demoTokenIdentities, readSecret } from './auth/secrets.js';
 import { ChainVerifier, CognitoTokenVerifier, StaticTokenVerifier, devTokens, type TokenVerifier } from './auth/verify.js';
-import { checkNtfyTopic, type HubConfig } from './config.js';
+import { checkNtfyTopic, parseWhatsApp, type HubConfig } from './config.js';
 import { AgentCoreConcierge, HttpConcierge, type ConciergeClient } from './http/concierge.js';
 import { createApp } from './http/app.js';
 import { demoHousehold } from './seed.js';
 import { KinwiseService } from './services/kinwise.js';
 import { PollySynth, type SpeechSynth } from './speech/speech.js';
 import { ackKey, signAck } from './services/ackLink.js';
-import { MultiNotifier, NtfyNotifier, OutboxNotifier, SnsNotifier, type Notifier } from './services/notifier.js';
+import { MultiNotifier, NtfyNotifier, OutboxNotifier, SnsNotifier, WhatsAppNotifier, type Notifier } from './services/notifier.js';
 import { DynamoStore } from './store/dynamo.js';
 import { MemoryStore } from './store/memory.js';
 import type { Store } from './store/store.js';
@@ -18,6 +18,17 @@ async function resolveSecrets(config: HubConfig): Promise<{ config: HubConfig; d
   const resolved = { ...config };
   if (config.ingestSecretArn) resolved.ingestSecret = await readSecret(config.ingestSecretArn);
   if (config.ntfy?.topicSecretArn) resolved.ntfy = { ...config.ntfy, topic: checkNtfyTopic(await readSecret(config.ntfy.topicSecretArn)) };
+  if (config.whatsapp?.secretArn) {
+    let creds;
+    try {
+      creds = parseWhatsApp(JSON.parse(await readSecret(config.whatsapp.secretArn)));
+    } catch {
+      creds = undefined;
+    }
+    // A placeholder or half-filled secret leaves WhatsApp off; the hub still starts and the TV stays honest.
+    if (!creds) console.warn('[whatsapp] secret is not filled in yet: WhatsApp is off');
+    resolved.whatsapp = { ...config.whatsapp, creds };
+  }
   const demoIdentities = config.demoTokenSeedArn
     ? demoTokenIdentities(await readSecret(config.demoTokenSeedArn), config.demoHouseholdId)
     : {};
@@ -36,18 +47,14 @@ export async function bootstrap(input: HubConfig, inject: { speech?: SpeechSynth
   const outbox = new OutboxNotifier();
   const channels: Notifier[] = [outbox];
   if (config.snsTopicArn) channels.push(new SnsNotifier(config.snsTopicArn));
+  const ackKeyValue = ackKey(config.ingestSecret);
+  // Without a public address a message still goes out, just without the confirm link.
+  const ackUrl = (n: { callId?: string; householdId: string }) =>
+    n.callId && config.publicBaseUrl ? `${config.publicBaseUrl}/ack/${signAck(ackKeyValue, { householdId: n.householdId, callId: n.callId }, Date.now())}` : undefined;
   if (config.ntfy?.topic) {
-    const ntfy = { server: config.ntfy.server, topic: config.ntfy.topic };
-    const key = ackKey(config.ingestSecret);
-    channels.push(
-      new NtfyNotifier({
-        ...ntfy,
-        fetch: inject.fetch,
-        // Without a public address the push still goes out, just without the confirm button.
-        ackUrl: (n) => (n.callId && config.publicBaseUrl ? `${config.publicBaseUrl}/ack/${signAck(key, { householdId: n.householdId, callId: n.callId }, Date.now())}` : undefined),
-      }),
-    );
+    channels.push(new NtfyNotifier({ server: config.ntfy.server, topic: config.ntfy.topic, fetch: inject.fetch, ackUrl }));
   }
+  if (config.whatsapp?.creds) channels.push(new WhatsAppNotifier({ ...config.whatsapp.creds, fetch: inject.fetch, ackUrl }));
   const notifier: Notifier = channels.length > 1 ? new MultiNotifier(channels) : outbox;
   const service = new KinwiseService({ store, notifier });
 

@@ -72,6 +72,15 @@ describe('KinwiseStack', () => {
     for (const fn of fns) expect(fn.Properties?.Environment?.Variables ?? {}).not.toHaveProperty('NTFY_TOPIC');
   });
 
+  it('keeps WhatsApp credentials in a secret the hub can read, not in the environment', () => {
+    t.hasResourceProperties('AWS::SecretsManager::Secret', { Description: Match.stringLikeRegexp('Twilio WhatsApp') });
+    t.hasResourceProperties('AWS::Lambda::Function', { Environment: { Variables: Match.objectLike({ WHATSAPP_SECRET_ARN: Match.anyValue() }) } });
+    for (const fn of Object.values(t.findResources('AWS::Lambda::Function')) as any[]) {
+      const vars = fn.Properties?.Environment?.Variables ?? {};
+      for (const k of ['WHATSAPP_AUTH_TOKEN', 'WHATSAPP_TO', 'WHATSAPP_ACCOUNT_SID']) expect(vars).not.toHaveProperty(k);
+    }
+  });
+
   it('can leave phone push out', () => {
     const app = new App();
     const off = Template.fromStack(

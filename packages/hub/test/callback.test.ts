@@ -106,6 +106,38 @@ describe('Meera confirms she is calling', () => {
   });
 });
 
+describe('over HTTP: WhatsApp reaches the caregiver', () => {
+  it('sends the call request to WhatsApp with a working confirm link, and a failure is told to the TV', async () => {
+    for (const twilioStatus of [201, 400]) {
+      const sent: Array<{ url: string; body: string }> = [];
+      const config = loadConfig({
+        AUTH_MODE: 'dev', STORE: 'memory', CONCIERGE_URL: '', PUBLIC_BASE_URL: 'https://hub.example',
+        WHATSAPP_ACCOUNT_SID: 'AC' + 'a1'.repeat(16), WHATSAPP_AUTH_TOKEN: 'tok', WHATSAPP_FROM: 'whatsapp:+14155238886', WHATSAPP_TO: 'whatsapp:+919876543210',
+      } as NodeJS.ProcessEnv);
+      const restore = console.error;
+      console.error = () => {};
+      const { app } = await bootstrap(config, {
+        fetch: (async (url: string, init: { body: string }) => {
+          sent.push({ url, body: init.body });
+          return new Response('{"code":63016}', { status: twilioStatus });
+        }) as unknown as typeof globalThis.fetch,
+      });
+      const call = (path: string, init: RequestInit = {}, token?: string) =>
+        app.fetch(new Request(`https://hub.example${path}`, { ...init, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(init.headers ?? {}) } }));
+      const ring = await (await call('/dev/visitor', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).json();
+      const out = await (await call(`/tv/alerts/${ring.alertId}/respond`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'call_family' }) }, 'dev-tv')).json();
+      console.error = restore;
+      expect(out.delivered).toBe(twilioStatus === 201);
+      const text = new URLSearchParams(sent.find((s) => s.url.includes('twilio'))!.body).get('Body')!;
+      const link = /https:\/\/hub\.example\/ack\/\S+/.exec(text)![0];
+      if (twilioStatus === 201) {
+        expect((await call(new URL(link).pathname, { method: 'POST' })).status).toBe(200);
+        expect((await (await call('/tv/state', {}, 'dev-tv')).json()).today.messages[0].from).toBe('Meera');
+      }
+    }
+  });
+});
+
 describe('over HTTP: the push button and the confirm page', () => {
   const topic = 'kw-test-topic-0123456789';
   async function app(pushStatus = 200) {

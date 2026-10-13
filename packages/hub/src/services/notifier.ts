@@ -103,6 +103,51 @@ export class NtfyNotifier implements Notifier {
   }
 }
 
+export interface WhatsAppOptions {
+  accountSid: string;
+  authToken: string;
+  from: string;
+  to: string;
+  /** The signed "I'm calling now" link for a call request, or undefined when the hub has no public address. */
+  ackUrl: (notice: CaregiverNotice) => string | undefined;
+  fetch?: typeof globalThis.fetch;
+  timeoutMs?: number;
+}
+
+/**
+ * WhatsApp to the caregiver through Twilio. A call request carries the signed confirm link; opening it shows
+ * one button. Twilio's sandbox only delivers free text within 24 hours of the caregiver last writing to it
+ * (error 63016 otherwise); a production number would use a Meta-approved template instead.
+ */
+export class WhatsAppNotifier implements Notifier {
+  constructor(private readonly opts: WhatsAppOptions) {}
+
+  async notify(notice: CaregiverNotice): Promise<boolean> {
+    const ack = notice.kind === 'call_request' ? this.opts.ackUrl(notice) : undefined;
+    const text = [notice.title, notice.body, ...(ack ? [`Tap to tell them you are calling: ${ack}`] : [])].join('\n\n');
+    try {
+      const res = await (this.opts.fetch ?? fetch)(`https://api.twilio.com/2010-04-01/Accounts/${this.opts.accountSid}/Messages.json`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          authorization: `Basic ${Buffer.from(`${this.opts.accountSid}:${this.opts.authToken}`).toString('base64')}`,
+        },
+        body: new URLSearchParams({ From: this.opts.from, To: this.opts.to, Body: text }).toString(),
+        signal: AbortSignal.timeout(this.opts.timeoutMs ?? 8000),
+      });
+      if (!res.ok) {
+        // Only Twilio's error code is logged: never the number, the token or the message.
+        const code = await res.json().then((j: { code?: unknown }) => j.code, () => undefined);
+        console.error(`[whatsapp] message refused: HTTP ${res.status}${code ? `, Twilio code ${String(code)}` : ''}`);
+      }
+      return res.ok;
+    } catch (err) {
+      console.error('[whatsapp] message failed:', err instanceof Error ? err.message : 'unknown error');
+      return false;
+    }
+  }
+}
+
 /**
  * Fan out to several notifiers; one failing channel never blocks the others. The answer is whether the
  * caregiver was really reached: a real channel succeeded (or, in the local demo with no real channel, the simulated phone did).

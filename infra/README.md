@@ -9,6 +9,7 @@ One stack, `Kinwise`, in `us-east-1`:
 | Cognito user pool + resource server `kinwise` | The Alexa+ two-tier OAuth: `alexa-plus-service` (client_credentials → `mcp:service`), `alexa-plus-account-linking` (auth code + secret), `kinwise-echo-simulator` (public, auth code + PKCE) |
 | Secrets Manager | The Ring → hub HMAC ingest secret, and the seed for hosted-demo tokens |
 | SNS | Caregiver alerts (optional e-mail subscription) |
+| Secrets Manager (`WhatsAppTwilio`) | Twilio WhatsApp credentials and the caregiver's number (you fill it in once) |
 | Secrets Manager (`NtfyTopic`) | The random ntfy topic that carries the push to the caregiver's phone |
 | Bedrock AgentCore Runtime + Memory | The concierge (Strands agent, Nova 2 Lite), deployed as a Python code asset |
 | Amazon Polly (neural, voice `Joanna`) | The natural voice for the TV and the Echo simulator. The hub may only call `polly:SynthesizeSpeech`; settings `SPEECH`, `POLLY_VOICE`, `POLLY_ENGINE` |
@@ -41,9 +42,30 @@ npx cdk deploy \
 
 If step 1 is skipped, the stack deploys without the AgentCore Runtime (output `ConciergeSkipped`), and `/sim/ask` returns 503 until you deploy again.
 
-Context options: `authDomainPrefix`, `callbackUrls`, `allowedOrigins`, `caregiverEmail`, `phonePush` (default `true`), `ntfyServer` (default `https://ntfy.sh`), `conciergeModelId` (default `us.amazon.nova-2-lite-v1:0`), `demoTimezone`, `devRoutes` (default `true`; the demo helpers still require a household token when hosted).
+Context options: `authDomainPrefix`, `callbackUrls`, `allowedOrigins`, `caregiverEmail`, `phonePush` (default `true`), `whatsapp` (default `true`), `ntfyServer` (default `https://ntfy.sh`), `conciergeModelId` (default `us.amazon.nova-2-lite-v1:0`), `demoTimezone`, `devRoutes` (default `true`; the demo helpers still require a household token when hosted).
 
 ## After deploying
+
+### WhatsApp for the caregiver (no app to install)
+
+The hub can message the caregiver on WhatsApp through [Twilio's WhatsApp sandbox](https://www.twilio.com/docs/whatsapp/sandbox).
+The message carries the "Tap to tell them you are calling" link; opening it shows one button.
+
+1. Make a free Twilio account. In the console open **Messaging, Try it out, Send a WhatsApp message**.
+2. From the caregiver's WhatsApp, send the sandbox number the **`join <two words>`** message the console shows.
+3. Put your credentials into the secret (run it yourself; it keeps the token out of chat and shell history files if you use a file):
+   ```bash
+   aws secretsmanager put-secret-value --region us-east-1 --secret-id <WhatsAppTwilio secret ARN> --secret-string      '{"accountSid":"AC...","authToken":"...","from":"whatsapp:+14155238886","to":"whatsapp:+91XXXXXXXXXX"}'
+   ```
+   The `to` number is the caregiver's own WhatsApp number. The hub reads the secret when it starts, so make a
+   running hub restart once:
+   ```bash
+   aws lambda update-function-configuration --region us-east-1 --function-name <hub function name> --description "reload secrets"
+   ```
+4. Press **Call Meera**. If Twilio answers with error **63016**, the sandbox 24-hour window has closed: send `join ...` again.
+
+What leaves the hub: the notice title and body, the signed link and the caregiver's number (to Twilio and Meta). Nothing from
+recordings, transcripts or reminders. A production setup would use a Meta-approved message template instead of free text.
 
 ### Get Meera's phone to ring (push notifications)
 

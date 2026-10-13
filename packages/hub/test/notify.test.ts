@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { loadConfig } from '../src/config.js';
+import { loadConfig, parseWhatsApp } from '../src/config.js';
 import { ackKey, signAck, verifyAck } from '../src/services/ackLink.js';
-import { MultiNotifier, NtfyNotifier, OutboxNotifier, type CaregiverNotice, type Notifier } from '../src/services/notifier.js';
+import { MultiNotifier, NtfyNotifier, OutboxNotifier, WhatsAppNotifier, type CaregiverNotice, type Notifier } from '../src/services/notifier.js';
 
 const notice = (over: Partial<CaregiverNotice> = {}): CaregiverNotice => ({
   householdId: 'hh-asha',
@@ -138,5 +138,79 @@ describe('config: NTFY_TOPIC is a password', () => {
   it('refuses a guessable topic or a non-https server', () => {
     expect(() => loadConfig(env({ NTFY_TOPIC: 'meera' }))).toThrow(/NTFY_TOPIC/);
     expect(() => loadConfig(env({ NTFY_TOPIC: 'kw-a1b2c3d4e5f6a7b8', NTFY_SERVER: 'http://push.example.org' }))).toThrow(/NTFY_SERVER/);
+  });
+});
+
+describe('WhatsAppNotifier (Twilio)', () => {
+  const creds = { accountSid: 'AC' + 'a1'.repeat(16), authToken: 'tok-secret-value', from: 'whatsapp:+14155238886', to: 'whatsapp:+919876543210' };
+  type Call = { url: string; form: URLSearchParams; auth: string };
+  function twilio(status: number, body: unknown = { sid: 'SM1' }) {
+    const calls: Call[] = [];
+    const fetch = (async (url: string, init: { body: string; headers: Record<string, string> }) => {
+      calls.push({ url, form: new URLSearchParams(init.body), auth: init.headers.authorization! });
+      return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof globalThis.fetch;
+    return { calls, fetch };
+  }
+
+  it('sends the call request as a WhatsApp message with the tap-to-confirm link', async () => {
+    const { calls, fetch } = twilio(201);
+    const wa = new WhatsAppNotifier({ ...creds, ackUrl: (n) => `https://hub.example/ack/${n.callId}`, fetch });
+    expect(await wa.notify(notice())).toBe(true);
+    expect(calls[0]!.url).toBe(`https://api.twilio.com/2010-04-01/Accounts/${creds.accountSid}/Messages.json`);
+    expect(calls[0]!.auth).toBe('Basic ' + Buffer.from(`${creds.accountSid}:${creds.authToken}`).toString('base64'));
+    expect(calls[0]!.form.get('From')).toBe(creds.from);
+    expect(calls[0]!.form.get('To')).toBe(creds.to);
+    const text = calls[0]!.form.get('Body')!;
+    expect(text).toContain('Asha wants to talk to you now');
+    expect(text).toContain('https://hub.example/ack/call_1');
+  });
+
+  it('has no link on a Pause or a warning', async () => {
+    const { calls, fetch } = twilio(201);
+    const wa = new WhatsAppNotifier({ ...creds, ackUrl: () => 'https://hub.example/ack/x', fetch });
+    await wa.notify(notice({ kind: 'pause', callId: undefined }));
+    expect(calls[0]!.form.get('Body')).not.toContain('https://');
+  });
+
+  it('returns false and logs only the Twilio error code, never the number or the token', async () => {
+    const logged: string[] = [];
+    const orig = console.error;
+    console.error = (...a: unknown[]) => void logged.push(a.join(' '));
+    const { fetch } = twilio(400, { code: 63016, message: 'Outside the allowed window' });
+    const wa = new WhatsAppNotifier({ ...creds, ackUrl: () => undefined, fetch });
+    expect(await wa.notify(notice())).toBe(false);
+    const down = new WhatsAppNotifier({ ...creds, ackUrl: () => undefined, fetch: (async () => { throw new Error('offline'); }) as unknown as typeof globalThis.fetch });
+    expect(await down.notify(notice())).toBe(false);
+    console.error = orig;
+    const all = logged.join('\n');
+    expect(all).toContain('63016');
+    expect(all).not.toContain('919876543210');
+    expect(all).not.toContain(creds.authToken);
+  });
+});
+
+describe('config: WhatsApp credentials', () => {
+  const good = { accountSid: 'AC' + 'a1'.repeat(16), authToken: 'tok', from: 'whatsapp:+14155238886', to: 'whatsapp:+919876543210' };
+
+  it('accepts a complete, well-formed set', () => {
+    expect(parseWhatsApp(good)).toEqual(good);
+  });
+
+  it('turns the channel off (undefined) for placeholders, missing parts, or a number that is not whatsapp:+digits', () => {
+    expect(parseWhatsApp({ placeholder: 'x' })).toBeUndefined();
+    expect(parseWhatsApp({ ...good, to: '+919876543210' })).toBeUndefined();
+    expect(parseWhatsApp({ ...good, accountSid: 'nope' })).toBeUndefined();
+    expect(parseWhatsApp({ ...good, authToken: '' })).toBeUndefined();
+    expect(parseWhatsApp(null)).toBeUndefined();
+  });
+
+  it('is read from WHATSAPP_* variables or a secret ARN', () => {
+    const env = (extra: Record<string, string>) => ({ AUTH_MODE: 'dev', STORE: 'memory', ...extra }) as NodeJS.ProcessEnv;
+    expect(loadConfig(env({})).whatsapp).toBeUndefined();
+    expect(loadConfig(env({ WHATSAPP_SECRET_ARN: 'arn:x' })).whatsapp).toEqual({ secretArn: 'arn:x' });
+    expect(
+      loadConfig(env({ WHATSAPP_ACCOUNT_SID: good.accountSid, WHATSAPP_AUTH_TOKEN: 'tok', WHATSAPP_FROM: good.from, WHATSAPP_TO: good.to })).whatsapp,
+    ).toEqual({ creds: good });
   });
 });

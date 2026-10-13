@@ -28,6 +28,8 @@ export interface KinwiseStackProps extends StackProps {
   caregiverEmail?: string;
   /** Push the caregiver's phone through ntfy (a random topic is generated into Secrets Manager). Default true. */
   phonePush?: boolean;
+  /** Create the secret that holds Twilio WhatsApp credentials for caregiver messages (you fill it in). Default true. */
+  whatsapp?: boolean;
   /** ntfy server, https only. Default https://ntfy.sh. */
   ntfyServer?: string;
   conciergeModelId: string;
@@ -81,6 +83,16 @@ export class KinwiseStack extends Stack {
         : new secrets.Secret(this, 'NtfyTopic', {
             description: 'ntfy topic that carries caregiver push notifications. Subscribe the caregiver phone to it; treat it like a password.',
             generateSecretString: { secretStringTemplate: '{}', generateStringKey: 'value', passwordLength: 32, excludePunctuation: true },
+          });
+
+    // Twilio WhatsApp credentials and the caregiver's own number: personal data, so a secret, never an env var.
+    // The stack only creates it with a placeholder; fill it in once (infra/README.md). Until then WhatsApp stays off.
+    const whatsappSecret =
+      props.whatsapp === false
+        ? undefined
+        : new secrets.Secret(this, 'WhatsAppTwilio', {
+            description: 'Twilio WhatsApp credentials and the caregiver number. Replace the placeholder with JSON: accountSid, authToken, from, to.',
+            generateSecretString: { secretStringTemplate: '{}', generateStringKey: 'placeholder', passwordLength: 8, excludePunctuation: true },
           });
 
     // ── Cognito: Alexa+ two-tier OAuth ──
@@ -173,6 +185,10 @@ export class KinwiseStack extends Stack {
         POLLY_ENGINE: 'neural',
       },
     });
+    if (whatsappSecret) {
+      hub.addEnvironment('WHATSAPP_SECRET_ARN', whatsappSecret.secretArn);
+      whatsappSecret.grantRead(hub);
+    }
     if (ntfyTopic) {
       hub.addEnvironment('NTFY_TOPIC_SECRET_ARN', ntfyTopic.secretArn);
       hub.addEnvironment('NTFY_SERVER', props.ntfyServer ?? 'https://ntfy.sh');
