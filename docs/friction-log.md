@@ -122,7 +122,7 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
 ### 15. Twilio WhatsApp on a trial account: the sandbox accepts "join", then refuses to send (🟠, first-hand, 2026-10-13, from India)
 - **Task:** message the caregiver on WhatsApp when the resident presses "Call Meera", with no app to install.
 - **Friction, in order:**
-  1. The sandbox shows its own number and join code per account (here +1 737 250 8034 and `join twilio-trial`), not the number in most tutorials. The tutorial number gives an error that does not say the number is wrong.
+  1. The sandbox shows its own number and join code per account (a different US number and a two-word `join` code from the ones in most tutorials), not the number in most tutorials. The tutorial number gives an error that does not say the number is wrong.
   2. A plain `Body` message from the sandbox number is refused with HTTP 400, code **21654**, *"ContentSid Required"*. The error page says it applies when `ContentVariables` is sent without `ContentSid`, and the request had no `ContentVariables`.
   3. The way out is a Content template. Creating one is refused on a trial account with code **20003**, *"This feature is not available on a Trial account"*, so a free account cannot send WhatsApp from code at all.
   4. Twilio's *"accepted"* answer means queued, not delivered. Other WhatsApp failures, for example the 24-hour window (error 63016), can arrive only in a later status callback, so a hub that trusts the first HTTP answer can tell the user a message was sent when it was not.
