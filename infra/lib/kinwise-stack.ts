@@ -28,6 +28,8 @@ export interface KinwiseStackProps extends StackProps {
   caregiverEmail?: string;
   /** Push the caregiver's phone through ntfy (a random topic is generated into Secrets Manager). Default true. */
   phonePush?: boolean;
+  /** Send text messages (Amazon SNS SMS) to the numbers caregivers set. Costs money per message (account SMS spend limit applies). Default true. */
+  sms?: boolean;
   /** Create the secret that holds Twilio WhatsApp credentials for caregiver messages (you fill it in). Default true. */
   whatsapp?: boolean;
   /** ntfy server, https only. Default https://ntfy.sh. */
@@ -198,6 +200,14 @@ export class KinwiseStack extends Stack {
     // SynthesizeSpeech has no resource-level permissions, so it can only be granted on "*".
     hub.addToRolePolicy(new iam.PolicyStatement({ actions: ['polly:SynthesizeSpeech'], resources: ['*'] }));
     alerts.grantPublish(hub);
+    // A caregiver's e-mail is subscribed to this topic with a filter on their own id.
+    hub.addToRolePolicy(new iam.PolicyStatement({ actions: ['sns:Subscribe', 'sns:Unsubscribe', 'sns:ListSubscriptionsByTopic'], resources: [alerts.topicArn] }));
+    if (props.sms !== false) {
+      // Publishing to a phone number has no resource to scope to, so it can only be granted on "*" (like Polly).
+      // The account's monthly SMS spend limit is what bounds the cost.
+      hub.addToRolePolicy(new iam.PolicyStatement({ actions: ['sns:Publish'], resources: ['*'] }));
+      hub.addEnvironment('SMS_ENABLED', 'true');
+    }
     ingestSecret.grantRead(hub);
     demoSeed.grantRead(hub);
 

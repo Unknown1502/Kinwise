@@ -57,7 +57,7 @@ export function createApp(deps: AppDeps): Hono<Env> {
       origin: (origin) => (allowed.has(origin) ? origin : null),
       allowHeaders: ['authorization', 'content-type', 'mcp-protocol-version', 'mcp-session-id', 'last-event-id'],
       exposeHeaders: ['mcp-session-id', 'mcp-protocol-version', 'server-timing'],
-      allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+      allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       maxAge: 600,
     }),
   );
@@ -285,6 +285,26 @@ export function createApp(deps: AppDeps): Hono<Env> {
       throw err;
     }
     return wantsPage ? page(c, 200, 'Done', 'Their TV now says you are calling. Thank you.') : c.json({ ok: true });
+  });
+  // Where Kinwise reaches this caregiver: their own e-mail, SMS and WhatsApp number.
+  app.get('/caregiver/contacts', async (c) => {
+    const auth = await authenticate(c);
+    if (auth instanceof Response) return auth;
+    return c.json({ contacts: await service.getContacts(auth) });
+  });
+  app.put('/caregiver/contacts', async (c) => {
+    const auth = await authenticate(c);
+    if (auth instanceof Response) return auth;
+    const body = await c.req.json<Record<string, unknown>>().catch(() => undefined);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new ValidationError('Send JSON like {"sms": "+919876543210"}');
+    const patch: Record<string, string | null> = {};
+    for (const kind of ['email', 'sms', 'whatsapp']) {
+      const v = body[kind];
+      if (v === undefined) continue;
+      if (v !== null && typeof v !== 'string') throw new ValidationError(`${kind} must be text, or null to remove it`);
+      patch[kind] = v;
+    }
+    return c.json(await service.setContacts(auth, patch));
   });
   // The same confirmation from a signed-in caregiver (the simulator's phone panel, a future app).
   app.post('/caregiver/calls/:id/ack', async (c) => {

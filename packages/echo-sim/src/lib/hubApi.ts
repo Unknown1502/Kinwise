@@ -206,3 +206,37 @@ export async function confirmCall(hubUrl: string, callId: string, fetchImpl: Fet
     return { ok: false, message: `Can't reach the hub at ${hubUrl}.` };
   }
 }
+
+export interface Contacts {
+  email?: string;
+  sms?: string;
+  whatsapp?: string;
+}
+
+/** Meera's own contact details (needs her login). */
+export async function loadContacts(hubUrl: string, fetchImpl: FetchImpl = defaultFetch, token?: string): Promise<DevOutcome<Contacts>> {
+  try {
+    const res = await fetchImpl(`${hubUrl}/caregiver/contacts`, { cache: 'no-store', headers: bearer(token) });
+    if (!res.ok) return { ok: false, message: `Could not load contacts (HTTP ${res.status}).` };
+    const body = (await readJson(res)) as { contacts?: Contacts } | undefined;
+    return { ok: true, data: body?.contacts ?? {} };
+  } catch {
+    return { ok: false, message: `Can't reach the hub at ${hubUrl}.` };
+  }
+}
+
+/** Save contacts. An empty string removes one. Says plainly what the hub said (it asks for a minute between changes). */
+export async function saveContacts(hubUrl: string, patch: Record<string, string>, fetchImpl: FetchImpl = defaultFetch, token?: string): Promise<DevOutcome<{ contacts: Contacts; email: string }>> {
+  try {
+    const res = await fetchImpl(`${hubUrl}/caregiver/contacts`, {
+      method: 'PUT',
+      headers: { ...bearer(token), 'content-type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    const body = (await readJson(res)) as { contacts?: Contacts; email?: string; error_description?: string } | undefined;
+    if (!res.ok) return { ok: false, message: body?.error_description ?? `Could not save (HTTP ${res.status}).` };
+    return { ok: true, data: { contacts: body?.contacts ?? {}, email: body?.email ?? 'unchanged' } };
+  } catch {
+    return { ok: false, message: `Can't reach the hub at ${hubUrl}.` };
+  }
+}

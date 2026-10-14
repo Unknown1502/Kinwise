@@ -1036,6 +1036,34 @@ button:disabled {
   color: #ff8a65;
 }
 
+.contacts {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.contacts summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+.contact-row {
+  display: grid;
+  gap: 3px;
+  margin: 8px 0;
+}
+.contact-row input {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+}
+.contact-msg {
+  margin: 8px 0 0;
+  color: #d9ddd5;
+}
+
 /* ── demo controls ── */
 .demo-controls {
   border: 1px solid var(--line);

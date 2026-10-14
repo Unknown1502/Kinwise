@@ -5,10 +5,10 @@ import { checkNtfyTopic, parseWhatsApp, type HubConfig } from './config.js';
 import { AgentCoreConcierge, HttpConcierge, type ConciergeClient } from './http/concierge.js';
 import { createApp } from './http/app.js';
 import { demoHousehold } from './seed.js';
-import { KinwiseService, type Clock } from './services/kinwise.js';
+import { KinwiseService, type Clock, type ContactSync } from './services/kinwise.js';
 import { PollySynth, type SpeechSynth } from './speech/speech.js';
 import { ackKey, signAck } from './services/ackLink.js';
-import { MultiNotifier, NtfyNotifier, OutboxNotifier, SnsNotifier, WhatsAppNotifier, type Notifier } from './services/notifier.js';
+import { MultiNotifier, NtfyNotifier, OutboxNotifier, SmsNotifier, SnsContactSync, SnsNotifier, WhatsAppNotifier, type Notifier } from './services/notifier.js';
 import { DynamoStore } from './store/dynamo.js';
 import { MemoryStore } from './store/memory.js';
 import type { Store } from './store/store.js';
@@ -54,9 +54,13 @@ export async function bootstrap(input: HubConfig, inject: { speech?: SpeechSynth
   if (config.ntfy?.topic) {
     channels.push(new NtfyNotifier({ server: config.ntfy.server, topic: config.ntfy.topic, fetch: inject.fetch, ackUrl }));
   }
-  if (config.whatsapp?.creds) channels.push(new WhatsAppNotifier({ ...config.whatsapp.creds, fetch: inject.fetch, ackUrl }));
+  // Each caregiver's own numbers are looked up per notice; `service` exists by the time a notice is sent.
+  const lookup = (householdId: string, caregiverId: string) => service.contactsFor(householdId, caregiverId);
+  if (config.whatsapp?.creds) channels.push(new WhatsAppNotifier({ ...config.whatsapp.creds, fetch: inject.fetch, ackUrl, lookup }));
+  if (config.smsEnabled) channels.push(new SmsNotifier({ lookup, ackUrl }));
   const notifier: Notifier = channels.length > 1 ? new MultiNotifier(channels) : outbox;
-  const service = new KinwiseService({ store, notifier, clock: inject.clock });
+  const contactSync: ContactSync | undefined = config.snsTopicArn ? new SnsContactSync(config.snsTopicArn) : undefined;
+  const service = new KinwiseService({ store, notifier, clock: inject.clock, contactSync });
 
   const deviceTokens: Record<string, Identity> = Object.fromEntries(
     Object.entries(config.deviceTokens).map(([token, d]) => [

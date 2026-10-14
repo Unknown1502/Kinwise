@@ -10,6 +10,7 @@ import {
   type AlertAction,
   type Consent,
   type ExpectedVisit,
+  type Contacts,
   type HouseholdState,
   type StoredNotice,
   type Recurrence,
@@ -143,13 +144,39 @@ export function adviceFor(level: RiskLevel, categories: readonly SignalCategory[
   return advice;
 }
 
+/** Subscribes a caregiver's e-mail to their own notices (and removes the old one). Absent where there is no SNS topic. */
+export interface ContactSync {
+  syncEmail(householdId: string, memberId: string, oldEmail: string | undefined, newEmail: string | undefined): Promise<void>;
+}
+
+export type ContactPatch = { [K in keyof Contacts]?: string | null };
+export interface ContactsResult {
+  contacts: Contacts;
+  /** unchanged · confirmation_sent (they must click AWS's confirmation e-mail) · removed · failed */
+  email: 'unchanged' | 'confirmation_sent' | 'removed' | 'failed';
+}
+
+const CONTACT_CHANGE_GAP_MS = 60_000;
+const EMAIL_SHAPE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
+const PHONE_SHAPE = /^\+[1-9]\d{7,14}$/;
+
+function checkContact(kind: keyof Contacts, raw: string): string {
+  const v = raw.trim();
+  if (kind === 'email' ? !(EMAIL_SHAPE.test(v) && v.length <= 254) : !PHONE_SHAPE.test(v)) {
+    throw new ValidationError(kind === 'email' ? 'That does not look like an e-mail address' : `The ${kind} number must look like +919876543210 (country code, digits only)`);
+  }
+  return v;
+}
+
 export class KinwiseService {
   private readonly store: Store;
   private readonly notifier: Notifier;
   private readonly clock: Clock;
   private readonly ids: IdGen;
+  private readonly contactSync?: ContactSync;
 
-  constructor(deps: { store: Store; notifier: Notifier; clock?: Clock; ids?: IdGen }) {
+  constructor(deps: { store: Store; notifier: Notifier; clock?: Clock; ids?: IdGen; contactSync?: ContactSync }) {
+    this.contactSync = deps.contactSync;
     this.store = deps.store;
     this.notifier = deps.notifier;
     this.clock = deps.clock ?? systemClock;
@@ -699,6 +726,63 @@ export class KinwiseService {
       s.tvCue = { id: this.ids('cue'), topic, text, at: now.toISOString() };
       return { topic, text, deliveredTo: `${resident(s).name}'s TV` };
     });
+  }
+
+  // ───────────────────────────── caregiver contacts ─────────────────────────────
+
+  private caregiverMember(s: HouseholdState, actor: Identity) {
+    const m = actor.role === 'caregiver' ? s.household.members.find((x) => x.id === actor.userId && x.role === 'caregiver') : undefined;
+    if (!m) throw new PermissionError('Only a family member can see or change their own contacts');
+    return m;
+  }
+
+  async getContacts(actor: Identity): Promise<Contacts> {
+    const { state } = await this.read(actor.householdId);
+    return { ...(this.caregiverMember(state, actor).contacts ?? {}) };
+  }
+
+  /** For the notifiers: where to reach this caregiver. No access logging, nothing leaves the hub except in a notice. */
+  async contactsFor(householdId: string, memberId: string): Promise<Contacts | undefined> {
+    const { state } = await this.read(householdId);
+    return state.household.members.find((m) => m.id === memberId)?.contacts;
+  }
+
+  /**
+   * The caregiver sets where Kinwise reaches them. A new e-mail is subscribed first (they must confirm AWS's
+   * message), and kept only if that worked, so nothing is ever stored that nothing is subscribed to.
+   */
+  async setContacts(actor: Identity, patch: ContactPatch): Promise<ContactsResult> {
+    const { state, now } = await this.read(actor.householdId);
+    const me = this.caregiverMember(state, actor);
+    const next: Contacts = { ...(me.contacts ?? {}) };
+    for (const kind of ['email', 'sms', 'whatsapp'] as const) {
+      const v = patch[kind];
+      if (v === undefined) continue;
+      if (v === null || v.trim() === '') delete next[kind];
+      else next[kind] = checkContact(kind, v);
+    }
+    if (me.contactsChangedAt && now.getTime() - Date.parse(me.contactsChangedAt) < CONTACT_CHANGE_GAP_MS) {
+      throw new ValidationError('Please wait a minute before changing contacts again');
+    }
+    const oldEmail = me.contacts?.email;
+    let email: ContactsResult['email'] = 'unchanged';
+    if (next.email !== oldEmail) {
+      try {
+        await this.contactSync?.syncEmail(actor.householdId, me.id, oldEmail, next.email);
+        email = next.email ? 'confirmation_sent' : 'removed';
+      } catch (err) {
+        console.error('[contacts] e-mail subscription failed:', err instanceof Error ? err.message : 'unknown error');
+        email = 'failed';
+        if (oldEmail) next.email = oldEmail;
+        else delete next.email;
+      }
+    }
+    await this.mutate(actor.householdId, (s2, at) => {
+      const m = this.caregiverMember(s2, actor);
+      m.contacts = next;
+      m.contactsChangedAt = at.toISOString();
+    });
+    return { contacts: next, email };
   }
 
   /** What the caregiver was told, newest first (the demo phone panel). No access logging: it is not a family look at Asha's day. */

@@ -56,7 +56,7 @@ notice. If none did, the TV says "We couldn't reach Meera" instead of promising 
 | **E-mail** (SNS) | works, used for the demo | subscribe an address once (below) |
 | Phone push (ntfy) | works | the free ntfy app and the topic below |
 | WhatsApp (Twilio) | built, **blocked on a Twilio trial account** | a paid Twilio account, or a rewrite for Meta's Cloud API ([friction log #15](../docs/friction-log.md)) |
-| SMS | not built | |
+| SMS (SNS) | built; verified on the AWS SMS sandbox only | the caregiver's own number; see "Contacts and SMS" |
 
 Every message carries only the title and body of the notice, and a call request carries a signed link that expires after an hour.
 Opening it shows one button; pressing **I'm calling now** puts a note from Meera on Asha's TV.
@@ -64,8 +64,29 @@ Opening it shows one button; pressing **I'm calling now** puts a note from Meera
 **When nobody answers.** "Delivered" only means a channel accepted the message, not that a person read it, so the TV keeps asking:
 after **2 minutes** with no confirmation the hub sends a second message ("Asha is still waiting for you", the same confirm link) and the
 TV's status chip turns amber ("Meera hasn't answered yet") and says so aloud; after **5 minutes** it says "Meera still hasn't answered.
-Please call Meera yourself." Exactly one second message is sent, even when the TV polls many times at once. All caregivers get the same
-message on the shared channels; a separate address per caregiver and SMS are not built.
+Please call Meera yourself." Exactly one second message is sent, even when the TV polls many times at once. Every caregiver is told, each on their own contacts (below); the first to confirm answers for all.
+
+#### Contacts and SMS: each caregiver reaches their own phone
+
+A caregiver sets their own contacts (e-mail, SMS number, WhatsApp number) in the simulator's phone panel ("Where should Kinwise reach
+Meera?") or with the API; nobody else can read or change them, and the TV never receives them:
+
+```bash
+curl -X PUT $HUB/caregiver/contacts -H "authorization: Bearer <caregiver token>" -H 'content-type: application/json'   -d '{"email":"meera@example.com","sms":"+919876543210","whatsapp":"+919876543210"}'     # "" or null removes one
+```
+
+- **E-mail** is subscribed to the alert topic with a filter on that caregiver's id, so a second caregiver gets only their own notices.
+  AWS sends the address a "Confirm subscription" e-mail; until it is clicked nothing arrives. The hub keeps an e-mail only if it
+  could subscribe it. Changing it removes the old confirmed subscription. (A subscription added by hand without a filter, such as one
+  made with `aws sns subscribe`, receives every caregiver's notices: remove it once the caregiver has set their own.)
+- **SMS** goes through Amazon SNS: `+<country code><digits>`, one message with the signal and the confirm link. **A new AWS account is in
+  the SMS sandbox:** you can text only numbers you have verified (`aws sns create-sms-sandbox-phone-number`, then
+  `verify-sms-sandbox-phone-number` with the one-time code), at most $1 a month. Leaving the sandbox means requesting production
+  access, and **sending to India also needs DLT registration** (a registered sender and template), so for a real family in India
+  use e-mail or WhatsApp. Turn SMS off with `-c sms=false`.
+- **WhatsApp** uses the caregiver's own number when set; the shared number in the Twilio secret is only a fallback.
+- Limits: a caregiver can change their contacts once a minute (so the API cannot be used to spam addresses with AWS confirmation
+  mails or to run up SMS), numbers must be `+` and 8-15 digits, and ntfy is still one shared topic for the household.
 
 #### E-mail (the demo route)
 

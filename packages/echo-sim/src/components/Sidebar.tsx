@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNotices } from '../hooks';
 import { clockTime } from '../lib/format';
-import { confirmCall, noticeKey, type Notice } from '../lib/hubApi';
+import { confirmCall, loadContacts, noticeKey, saveContacts, type Notice } from '../lib/hubApi';
 
 const KIND_ICON: Record<string, string> = { pause: '⏸', call_request: '📞', risk_high: '!' };
 const KIND_LABEL: Record<string, string> = { pause: 'Pause shown', call_request: 'Call request', risk_high: 'Warning signs' };
@@ -58,8 +58,49 @@ export function PhonePanel({ hubUrl, token }: { hubUrl: string; token?: string }
             </li>
           ))}
         </ol>
+        <ContactsForm hubUrl={hubUrl} token={token} />
       </div>
     </section>
+  );
+}
+
+/** Where Kinwise reaches Meera: her own e-mail, SMS and WhatsApp number (E.164). */
+function ContactsForm({ hubUrl, token }: { hubUrl: string; token?: string }) {
+  const [open, setOpen] = useState(false);
+  const [vals, setVals] = useState({ email: '', sms: '', whatsapp: '' });
+  const [msg, setMsg] = useState('');
+  useEffect(() => {
+    if (!open) return;
+    void loadContacts(hubUrl, undefined, token).then((out) => {
+      if (out.ok) setVals({ email: out.data.email ?? '', sms: out.data.sms ?? '', whatsapp: out.data.whatsapp ?? '' });
+    });
+  }, [open, hubUrl, token]);
+  const save = async () => {
+    setMsg('Saving…');
+    const out = await saveContacts(hubUrl, vals, undefined, token);
+    if (!out.ok) return setMsg(out.message);
+    setMsg(out.data.email === 'confirmation_sent' ? 'Saved. Check your e-mail for AWS’s “Confirm subscription” message.' : out.data.email === 'failed' ? 'Saved your numbers, but the e-mail could not be set up.' : 'Saved.');
+  };
+  return (
+    <details className="contacts" open={open} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
+      <summary>Where should Kinwise reach Meera?</summary>
+      {(['email', 'sms', 'whatsapp'] as const).map((k) => (
+        <label key={k} className="contact-row">
+          <span>{k === 'email' ? 'E-mail' : k === 'sms' ? 'SMS number' : 'WhatsApp number'}</span>
+          <input
+            value={vals[k]}
+            onChange={(e) => setVals((v) => ({ ...v, [k]: e.target.value }))}
+            placeholder={k === 'email' ? 'meera@example.com' : '+919876543210'}
+            inputMode={k === 'email' ? 'email' : 'tel'}
+            autoComplete="off"
+          />
+        </label>
+      ))}
+      <button type="button" className="notice-button" onClick={() => void save()}>
+        Save
+      </button>
+      {msg && <p className="contact-msg" role="status">{msg}</p>}
+    </details>
   );
 }
 

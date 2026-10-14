@@ -81,6 +81,18 @@ describe('KinwiseStack', () => {
     }
   });
 
+  it('lets the hub subscribe a caregiver e-mail to the topic and send SMS, nothing broader on the topic', () => {
+    t.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({ Action: ['sns:Subscribe', 'sns:Unsubscribe', 'sns:ListSubscriptionsByTopic'], Effect: 'Allow', Resource: Match.objectLike({ Ref: Match.stringLikeRegexp('CaregiverAlerts') }) }),
+          Match.objectLike({ Action: 'sns:Publish', Effect: 'Allow', Resource: '*' }),
+        ]),
+      },
+    });
+    t.hasResourceProperties('AWS::Lambda::Function', { Environment: { Variables: Match.objectLike({ SMS_ENABLED: 'true' }) } });
+  });
+
   it('can leave phone push out', () => {
     const app = new App();
     const off = Template.fromStack(

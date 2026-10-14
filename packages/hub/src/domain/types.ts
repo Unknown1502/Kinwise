@@ -22,6 +22,16 @@ export interface Member {
   role: Role;
   /** How the resident refers to this person, e.g. "Meera (daughter)". */
   relationship?: string;
+  /** Where Kinwise reaches this caregiver. Only they set it, and only they and the notifiers read it. */
+  contacts?: Contacts;
+  contactsChangedAt?: string;
+}
+
+/** A caregiver's own channels. E-mail and SMS/WhatsApp numbers (E.164, "+919876543210") are personal data. */
+export interface Contacts {
+  email?: string;
+  sms?: string;
+  whatsapp?: string;
 }
 
 export interface PauseMessage {

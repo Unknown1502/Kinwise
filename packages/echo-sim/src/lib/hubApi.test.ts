@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { askConcierge, confirmCall, describeDecision, fetchNotices, parseNotices, resetDemo, ringDoorbell } from './hubApi';
+import { askConcierge, confirmCall, loadContacts, saveContacts, describeDecision, fetchNotices, parseNotices, resetDemo, ringDoorbell } from './hubApi';
 
 const json = (status: number, body: unknown) => async () =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -119,5 +119,20 @@ describe('confirmCall (Meera confirms she is calling)', () => {
   it('says why when it did not work', async () => {
     expect(await confirmCall('http://hub', 'c', async () => new Response('{}', { status: 404 }))).toMatchObject({ ok: false, message: expect.stringMatching(/no longer/) });
     expect(await confirmCall('http://hub', 'c', async () => { throw new Error('x'); })).toMatchObject({ ok: false });
+  });
+});
+
+describe('contacts (Meera sets where Kinwise reaches her)', () => {
+  it('loads and saves with her login, and passes the hub own reason on', async () => {
+    const seen: Array<[string, RequestInit | undefined]> = [];
+    const fetchImpl = async (url: string, init?: RequestInit) => {
+      seen.push([String(url), init]);
+      return new Response(JSON.stringify(init?.method === 'PUT' ? { contacts: { sms: '+919876543210' }, email: 'unchanged' } : { contacts: { sms: '+919876543210' } }), { status: 200 });
+    };
+    expect(await loadContacts('http://hub', fetchImpl, 'tok')).toEqual({ ok: true, data: { sms: '+919876543210' } });
+    expect(await saveContacts('http://hub', { sms: '+919876543210' }, fetchImpl, 'tok')).toMatchObject({ ok: true, data: { email: 'unchanged' } });
+    expect(seen[1]![1]).toMatchObject({ method: 'PUT', body: '{"sms":"+919876543210"}', headers: { authorization: 'Bearer tok' } });
+    const wait = async () => new Response(JSON.stringify({ error: 'invalid_request', error_description: 'Please wait a minute before changing contacts again' }), { status: 400 });
+    expect(await saveContacts('http://hub', { sms: '' }, wait, 'tok')).toEqual({ ok: false, message: 'Please wait a minute before changing contacts again' });
   });
 });

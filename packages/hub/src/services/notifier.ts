@@ -1,4 +1,15 @@
-import { PublishCommand, SNSClient } from '@aws-sdk/client-sns';
+import {
+  ListSubscriptionsByTopicCommand,
+  PublishCommand,
+  SNSClient,
+  SubscribeCommand,
+  UnsubscribeCommand,
+  type Subscription,
+} from '@aws-sdk/client-sns';
+import type { Contacts } from '../domain/types.js';
+
+/** Where Kinwise reaches a caregiver, looked up per notice. */
+export type ContactLookup = (householdId: string, caregiverId: string) => Promise<Contacts | undefined>;
 
 /**
  * Privacy rule 2: a caregiver notice carries a signal, never content. No
@@ -64,10 +75,87 @@ export class SnsNotifier implements Notifier {
         MessageAttributes: {
           kind: { DataType: 'String', StringValue: notice.kind },
           householdId: { DataType: 'String', StringValue: notice.householdId },
+          // A caregiver's own e-mail subscription filters on this, so each caregiver gets only their notices.
+          caregiverId: { DataType: 'String', StringValue: notice.caregiverId },
         },
       }),
     );
     return true;
+  }
+}
+
+/** A text message to the caregiver's own number through Amazon SNS (SMS). Carries the signal and the confirm link, nothing else. */
+export class SmsNotifier implements Notifier {
+  constructor(
+    private readonly opts: {
+      lookup: ContactLookup;
+      ackUrl: (notice: CaregiverNotice) => string | undefined;
+      client?: SNSClient;
+    },
+  ) {}
+
+  async notify(notice: CaregiverNotice): Promise<boolean> {
+    const number = (await this.opts.lookup(notice.householdId, notice.caregiverId))?.sms;
+    if (!number) return false; // this caregiver has no number: not a failure of the service, simply nothing to send
+    const ack = notice.kind === 'call_request' ? this.opts.ackUrl(notice) : undefined;
+    const text = [`Kinwise: ${notice.title}.`, notice.kind === 'call_request' ? 'Please call now.' : '', ack ? `Tap to say you are calling: ${ack}` : '']
+      .filter(Boolean)
+      .join(' ');
+    try {
+      await (this.opts.client ?? (this.opts.client = new SNSClient({}))).send(
+        new PublishCommand({
+          PhoneNumber: number,
+          Message: text,
+          MessageAttributes: { 'AWS.SNS.SMS.SMSType': { DataType: 'String', StringValue: 'Transactional' } },
+        }),
+      );
+      return true;
+    } catch (err) {
+      // The number is personal data: log what went wrong, never to whom.
+      console.error('[sms] message failed:', err instanceof Error ? err.message.replace(/\+\d{6,}/g, '+***') : 'unknown error');
+      return false;
+    }
+  }
+}
+
+/** Keeps a caregiver's e-mail subscribed to the alert topic with a filter on their own id. */
+export class SnsContactSync {
+  constructor(
+    private readonly topicArn: string,
+    private readonly client: SNSClient = new SNSClient({}),
+  ) {}
+
+  async syncEmail(_householdId: string, memberId: string, oldEmail: string | undefined, newEmail: string | undefined): Promise<void> {
+    if (oldEmail) {
+      for (const sub of await this.list()) {
+        // A subscription still waiting for confirmation has no ARN to remove; AWS drops it after three days.
+        if (sub.Protocol === 'email' && sub.Endpoint === oldEmail && sub.SubscriptionArn?.startsWith('arn:')) {
+          await this.client.send(new UnsubscribeCommand({ SubscriptionArn: sub.SubscriptionArn }));
+        }
+      }
+    }
+    if (newEmail) {
+      await this.client.send(
+        new SubscribeCommand({
+          TopicArn: this.topicArn,
+          Protocol: 'email',
+          Endpoint: newEmail,
+          Attributes: { FilterPolicy: JSON.stringify({ caregiverId: [memberId] }) },
+          ReturnSubscriptionArn: true,
+        }),
+      );
+    }
+  }
+
+  private async list(): Promise<Subscription[]> {
+    const out: Subscription[] = [];
+    let next: string | undefined;
+    do {
+      const page = await this.client.send(new ListSubscriptionsByTopicCommand({ TopicArn: this.topicArn, NextToken: next }));
+      out.push(...(page.Subscriptions ?? []));
+      next = page.NextToken;
+    } while (next);
+    return out;
   }
 }
 
@@ -121,6 +209,8 @@ export interface WhatsAppOptions {
   to: string;
   /** The signed "I'm calling now" link for a call request, or undefined when the hub has no public address. */
   ackUrl: (notice: CaregiverNotice) => string | undefined;
+  /** The caregiver's own WhatsApp number wins over the shared `to`. */
+  lookup?: ContactLookup;
   fetch?: typeof globalThis.fetch;
   timeoutMs?: number;
 }
@@ -136,6 +226,8 @@ export class WhatsAppNotifier implements Notifier {
   async notify(notice: CaregiverNotice): Promise<boolean> {
     const ack = notice.kind === 'call_request' ? this.opts.ackUrl(notice) : undefined;
     const text = [notice.title, notice.body, ...(ack ? [`Tap to tell them you are calling: ${ack}`] : [])].join('\n\n');
+    const own = (await this.opts.lookup?.(notice.householdId, notice.caregiverId))?.whatsapp;
+    const to = own ? `whatsapp:${own}` : this.opts.to;
     try {
       const res = await (this.opts.fetch ?? fetch)(`https://api.twilio.com/2010-04-01/Accounts/${this.opts.accountSid}/Messages.json`, {
         method: 'POST',
@@ -143,7 +235,7 @@ export class WhatsAppNotifier implements Notifier {
           'content-type': 'application/x-www-form-urlencoded',
           authorization: `Basic ${Buffer.from(`${this.opts.accountSid}:${this.opts.authToken}`).toString('base64')}`,
         },
-        body: new URLSearchParams({ From: this.opts.from, To: this.opts.to, Body: text }).toString(),
+        body: new URLSearchParams({ From: this.opts.from, To: to, Body: text }).toString(),
         signal: AbortSignal.timeout(this.opts.timeoutMs ?? 8000),
       });
       if (!res.ok) {

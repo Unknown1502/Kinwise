@@ -27,6 +27,8 @@ export interface HubConfig {
   tableName?: string;
   dataFile: string;
   snsTopicArn?: string;
+  /** Text messages (Amazon SNS SMS) to the numbers caregivers give. Off unless asked for: SMS costs money. */
+  smsEnabled: boolean;
   /** Phone push to the caregiver through ntfy. The topic is the secret that routes the push, so it must be long. */
   ntfy?: { server: string; topic?: string; /** Secrets Manager ARN holding the topic (resolved at cold start). */ topicSecretArn?: string };
   /** WhatsApp to the caregiver through Twilio: credentials directly (local) or a Secrets Manager ARN (hosted). */
@@ -89,6 +91,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
     tableName: env.TABLE_NAME,
     dataFile: env.DATA_FILE ?? '.kinwise-data/state.json',
     snsTopicArn: env.SNS_TOPIC_ARN,
+    smsEnabled: env.SMS_ENABLED === 'true',
     ntfy: loadNtfy(env),
     whatsapp: loadWhatsApp(env),
     allowedOrigins: (env.ALLOWED_ORIGINS ?? 'http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174')
