@@ -75,7 +75,7 @@ aws sns subscribe --region us-east-1 --protocol email --notification-endpoint yo
 ```
 
 Or deploy with `-c caregiverEmail=you@example.com` (then pass it on every later deploy, or CloudFormation removes the subscription).
-Check the spam folder for the confirmation. The e-mail comes from AWS Notifications and has an unsubscribe link at the bottom.
+One Call Meera sends up to three e-mails within seconds (warning signs, the Pause, the call request). Only the last, with the subject starting **"Kinwise, action needed"**, has the button; the others say "No action needed now". Check the spam folder for the confirmation. The e-mail comes from AWS Notifications and has an unsubscribe link at the bottom.
 
 ### WhatsApp for the caregiver (Twilio sandbox: blocked on a trial account)
 

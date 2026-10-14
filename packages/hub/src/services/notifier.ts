@@ -47,17 +47,20 @@ export class SnsNotifier implements Notifier {
   ) {}
 
   async notify(notice: CaregiverNotice): Promise<boolean> {
-    const ack = notice.kind === 'call_request' ? this.ackUrl(notice) : undefined;
+    const needsAnswer = notice.kind === 'call_request';
+    const ack = needsAnswer ? this.ackUrl(notice) : undefined;
+    // One call sends up to three e-mails within seconds; only one needs the caregiver to do something, so say which.
     await this.client.send(
       new PublishCommand({
         TopicArn: this.topicArn,
-        Subject: `Kinwise: ${notice.title}`.slice(0, 99),
+        Subject: `${needsAnswer ? 'Kinwise, action needed' : 'Kinwise'}: ${notice.title}`.slice(0, 99),
         Message: [
           notice.title,
           notice.body,
           ...(ack ? [`Tap to tell them you are calling: ${ack}`] : []),
+          ...(needsAnswer ? [] : ['No action needed now. If they ask you to call, you will get a separate e-mail with a button.']),
           '— Kinwise (signals only: no recordings or transcripts are ever shared)',
-        ].join('\n\n'),
+        ].join('"""+NL+NL+"""'),
         MessageAttributes: {
           kind: { DataType: 'String', StringValue: notice.kind },
           householdId: { DataType: 'String', StringValue: notice.householdId },

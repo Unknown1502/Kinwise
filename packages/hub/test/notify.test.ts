@@ -226,9 +226,19 @@ describe('SnsNotifier (email to the caregiver)', () => {
   it('puts the tap-to-confirm link in the email for a call request', async () => {
     const { ok, sent } = await sendAll(notice(), (n) => `https://hub.example/ack/${n.callId}`);
     expect(ok).toBe(true);
-    expect(sent[0]!.Subject).toBe('Kinwise: Asha wants to talk to you now');
+    expect(sent[0]!.Subject).toBe('Kinwise, action needed: Asha wants to talk to you now');
     expect(sent[0]!.Message).toContain('Please call now');
     expect(sent[0]!.Message).toContain('https://hub.example/ack/call_1');
+  });
+
+  it('marks the e-mail that needs an answer, and tells the others that nothing is needed', async () => {
+    const call = await sendAll(notice(), () => undefined);
+    expect(call.sent[0]!.Subject).toBe('Kinwise, action needed: Asha wants to talk to you now');
+    const fyi = await sendAll(notice({ kind: 'pause', title: 'Kinwise paused a visit at the door', callId: undefined }), () => undefined);
+    expect(fyi.sent[0]!.Subject).toBe('Kinwise: Kinwise paused a visit at the door');
+    expect(fyi.sent[0]!.Message).toMatch(/No action needed now/);
+    expect(fyi.sent[0]!.Message).toMatch(/separate e-?mail with a button/);
+    expect(call.sent[0]!.Message).not.toMatch(/No action needed now/);
   });
 
   it('has no link on a Pause or a warning, and still says only the signal', async () => {
