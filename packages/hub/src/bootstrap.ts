@@ -8,7 +8,7 @@ import { demoHousehold } from './seed.js';
 import { KinwiseService, type Clock, type ContactSync } from './services/kinwise.js';
 import { PollySynth, type SpeechSynth } from './speech/speech.js';
 import { ackKey, signAck } from './services/ackLink.js';
-import { MultiNotifier, NtfyNotifier, OutboxNotifier, SmsNotifier, SnsContactSync, SnsNotifier, WhatsAppNotifier, type Notifier } from './services/notifier.js';
+import { EventBridgeFollowUp, MultiNotifier, NtfyNotifier, OutboxNotifier, SmsNotifier, SnsContactSync, SnsNotifier, WhatsAppNotifier, type Notifier } from './services/notifier.js';
 import { DynamoStore } from './store/dynamo.js';
 import { MemoryStore } from './store/memory.js';
 import type { Store } from './store/store.js';
@@ -60,7 +60,10 @@ export async function bootstrap(input: HubConfig, inject: { speech?: SpeechSynth
   if (config.smsEnabled) channels.push(new SmsNotifier({ lookup, ackUrl }));
   const notifier: Notifier = channels.length > 1 ? new MultiNotifier(channels) : outbox;
   const contactSync: ContactSync | undefined = config.snsTopicArn ? new SnsContactSync(config.snsTopicArn) : undefined;
-  const service = new KinwiseService({ store, notifier, clock: inject.clock, contactSync });
+  const service = new KinwiseService({ store, notifier, clock: inject.clock,
+    contactSync,
+    followUp: config.followUp ? new EventBridgeFollowUp(config.followUp) : undefined,
+  });
 
   const deviceTokens: Record<string, Identity> = Object.fromEntries(
     Object.entries(config.deviceTokens).map(([token, d]) => [

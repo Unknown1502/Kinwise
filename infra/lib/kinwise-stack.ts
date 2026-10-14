@@ -28,6 +28,8 @@ export interface KinwiseStackProps extends StackProps {
   caregiverEmail?: string;
   /** Push the caregiver's phone through ntfy (a random topic is generated into Secrets Manager). Default true. */
   phonePush?: boolean;
+  /** Wake the hub with one-time EventBridge Scheduler schedules for the 2-minute re-send, so it works with the TV off. Default true. */
+  followUp?: boolean;
   /** Send text messages (Amazon SNS SMS) to the numbers caregivers set. Costs money per message (account SMS spend limit applies). Default true. */
   sms?: boolean;
   /** Create the secret that holds Twilio WhatsApp credentials for caregiver messages (you fill it in). Default true. */
@@ -195,6 +197,28 @@ export class KinwiseStack extends Stack {
       hub.addEnvironment('NTFY_TOPIC_SECRET_ARN', ntfyTopic.secretArn);
       hub.addEnvironment('NTFY_SERVER', props.ntfyServer ?? 'https://ntfy.sh');
       ntfyTopic.grantRead(hub);
+    }
+    if (props.followUp !== false) {
+      // EventBridge Scheduler invokes the hub directly (not through the API) at the moment a follow-up is due.
+      const schedulerRole = new iam.Role(this, 'FollowUpSchedulerRole', {
+        assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com', { conditions: { StringEquals: { 'aws:SourceAccount': this.account } } }),
+        description: 'Lets EventBridge Scheduler invoke the Kinwise hub for the caregiver follow-up',
+      });
+      hub.grantInvoke(schedulerRole);
+      hub.addEnvironment('FOLLOWUP_ROLE_ARN', schedulerRole.roleArn);
+      hub.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ['scheduler:CreateSchedule'],
+          resources: [`arn:aws:scheduler:${this.region}:${this.account}:schedule/default/kinwise-followup-*`],
+        }),
+      );
+      hub.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ['iam:PassRole'],
+          resources: [schedulerRole.roleArn],
+          conditions: { StringEquals: { 'iam:PassedToService': 'scheduler.amazonaws.com' } },
+        }),
+      );
     }
     table.grantReadWriteData(hub);
     // SynthesizeSpeech has no resource-level permissions, so it can only be granted on "*".

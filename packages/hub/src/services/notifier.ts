@@ -6,6 +6,7 @@ import {
   UnsubscribeCommand,
   type Subscription,
 } from '@aws-sdk/client-sns';
+import { CreateScheduleCommand, SchedulerClient } from '@aws-sdk/client-scheduler';
 import type { Contacts } from '../domain/types.js';
 
 /** Where Kinwise reaches a caregiver, looked up per notice. */
@@ -156,6 +157,29 @@ export class SnsContactSync {
       next = page.NextToken;
     } while (next);
     return out;
+  }
+}
+
+/** One-time EventBridge Scheduler schedules that invoke the hub itself, then delete themselves. */
+export class EventBridgeFollowUp {
+  private readonly client: SchedulerClient;
+  constructor(private readonly opts: { roleArn: string; targetArn: string; client?: SchedulerClient }) {
+    this.client = opts.client ?? new SchedulerClient({});
+  }
+
+  async schedule(householdId: string, callId: string, at: Date): Promise<void> {
+    // Scheduler names allow only letters, digits, - _ . ; refuse anything else rather than let a bad id through.
+    if (!/^[A-Za-z0-9_.-]{1,64}$/.test(callId)) throw new Error('call id is not a valid schedule name');
+    await this.client.send(
+      new CreateScheduleCommand({
+        Name: `kinwise-followup-${callId}`,
+        ScheduleExpression: `at(${at.toISOString().slice(0, 19)})`,
+        ScheduleExpressionTimezone: 'UTC',
+        FlexibleTimeWindow: { Mode: 'OFF' },
+        ActionAfterCompletion: 'DELETE',
+        Target: { Arn: this.opts.targetArn, RoleArn: this.opts.roleArn, Input: JSON.stringify({ source: 'kinwise.followup', householdId }) },
+      }),
+    );
   }
 }
 

@@ -93,6 +93,19 @@ describe('KinwiseStack', () => {
     t.hasResourceProperties('AWS::Lambda::Function', { Environment: { Variables: Match.objectLike({ SMS_ENABLED: 'true' }) } });
   });
 
+  it('wakes the hub with one-time schedules: a role that can only invoke the hub, and a hub that can only create kinwise-followup schedules', () => {
+    t.hasResourceProperties('AWS::IAM::Role', {
+      AssumeRolePolicyDocument: { Statement: Match.arrayWith([Match.objectLike({ Principal: { Service: 'scheduler.amazonaws.com' }, Condition: { StringEquals: { 'aws:SourceAccount': '123456789012' } } })]) },
+    });
+    const statements = (Object.values(t.findResources('AWS::IAM::Policy')) as any[]).flatMap((p) => p.Properties.PolicyDocument.Statement as any[]);
+    const create = statements.find((x) => x.Action === 'scheduler:CreateSchedule');
+    expect(JSON.stringify(create.Resource)).toContain('schedule/default/kinwise-followup-*'); // only its own schedules, not every schedule
+    const pass = statements.find((x) => x.Action === 'iam:PassRole');
+    expect(pass.Condition).toEqual({ StringEquals: { 'iam:PassedToService': 'scheduler.amazonaws.com' } });
+    expect(statements.some((x) => x.Action === 'lambda:InvokeFunction' && x.Effect === 'Allow')).toBe(true); // the scheduler role may invoke the hub
+    t.hasResourceProperties('AWS::Lambda::Function', { Environment: { Variables: Match.objectLike({ FOLLOWUP_ROLE_ARN: Match.anyValue() }) } });
+  });
+
   it('can leave phone push out', () => {
     const app = new App();
     const off = Template.fromStack(

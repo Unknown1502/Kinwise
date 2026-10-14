@@ -29,6 +29,8 @@ export interface HubConfig {
   snsTopicArn?: string;
   /** Text messages (Amazon SNS SMS) to the numbers caregivers give. Off unless asked for: SMS costs money. */
   smsEnabled: boolean;
+  /** EventBridge Scheduler wakes the hub for the 2-minute re-send; off without a role. */
+  followUp?: { roleArn: string; targetArn: string };
   /** Phone push to the caregiver through ntfy. The topic is the secret that routes the push, so it must be long. */
   ntfy?: { server: string; topic?: string; /** Secrets Manager ARN holding the topic (resolved at cold start). */ topicSecretArn?: string };
   /** WhatsApp to the caregiver through Twilio: credentials directly (local) or a Secrets Manager ARN (hosted). */
@@ -92,6 +94,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
     dataFile: env.DATA_FILE ?? '.kinwise-data/state.json',
     snsTopicArn: env.SNS_TOPIC_ARN,
     smsEnabled: env.SMS_ENABLED === 'true',
+    followUp: loadFollowUp(env),
     ntfy: loadNtfy(env),
     whatsapp: loadWhatsApp(env),
     allowedOrigins: (env.ALLOWED_ORIGINS ?? 'http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174')
@@ -128,6 +131,17 @@ function loadNtfy(env: NodeJS.ProcessEnv): HubConfig['ntfy'] {
   const server = (env.NTFY_SERVER ?? 'https://ntfy.sh').replace(/\/$/, '');
   if (!server.startsWith('https://')) throw new Error('NTFY_SERVER must be an https:// URL');
   return { server, ...(topic ? { topic: checkNtfyTopic(topic) } : {}), ...(topicSecretArn ? { topicSecretArn } : {}) };
+}
+
+/** The scheduler role is given; the target is this very function (its name is set by Lambda), in the role's account. */
+function loadFollowUp(env: NodeJS.ProcessEnv): HubConfig['followUp'] {
+  const roleArn = env.FOLLOWUP_ROLE_ARN;
+  if (!roleArn) return undefined;
+  const account = /^arn:aws:iam::(\d{12}):role\//.exec(roleArn)?.[1];
+  const fn = env.AWS_LAMBDA_FUNCTION_NAME;
+  const region = env.AWS_REGION;
+  if (!account || !fn || !region) return undefined;
+  return { roleArn, targetArn: `arn:aws:lambda:${region}:${account}:function:${fn}` };
 }
 
 /** A complete, well-formed credential set, or undefined (a placeholder secret simply leaves WhatsApp off). */

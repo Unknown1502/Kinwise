@@ -149,6 +149,11 @@ export interface ContactSync {
   syncEmail(householdId: string, memberId: string, oldEmail: string | undefined, newEmail: string | undefined): Promise<void>;
 }
 
+/** Wakes the hub up later (EventBridge Scheduler) so a follow-up does not depend on the TV polling. */
+export interface FollowUpScheduler {
+  schedule(householdId: string, callId: string, at: Date): Promise<void>;
+}
+
 export type ContactPatch = { [K in keyof Contacts]?: string | null };
 export interface ContactsResult {
   contacts: Contacts;
@@ -174,9 +179,11 @@ export class KinwiseService {
   private readonly clock: Clock;
   private readonly ids: IdGen;
   private readonly contactSync?: ContactSync;
+  private readonly followUpScheduler?: FollowUpScheduler;
 
-  constructor(deps: { store: Store; notifier: Notifier; clock?: Clock; ids?: IdGen; contactSync?: ContactSync }) {
+  constructor(deps: { store: Store; notifier: Notifier; clock?: Clock; ids?: IdGen; contactSync?: ContactSync; followUp?: FollowUpScheduler }) {
     this.contactSync = deps.contactSync;
+    this.followUpScheduler = deps.followUp;
     this.store = deps.store;
     this.notifier = deps.notifier;
     this.clock = deps.clock ?? systemClock;
@@ -510,6 +517,7 @@ export class KinwiseService {
 
   async respondToAlert(actor: Identity, alertId: string, action: AlertAction): Promise<{ alert: AlertView; message: string; delivered?: boolean }> {
     this.requireResident(actor);
+    let askedCall: string | undefined;
     const { result, delivered } = await this.mutateNotifying(actor.householdId, (s, now, pending) => {
       const alert = s.alerts.find((a) => a.id === alertId);
       if (!alert) throw new NotFoundError('No such alert');
@@ -527,6 +535,7 @@ export class KinwiseService {
         // The TV acts through its device identity; voice requests come from the resident on the Echo.
         const surface = actor.role === 'device' ? 'the TV' : 'the Echo Show';
         const callId = this.ids('call');
+        askedCall = callId;
         s.callRequest = { id: callId, requestedAt: now.toISOString() };
         for (const c of caregivers(s)) {
           pending.notices.push({
@@ -549,6 +558,7 @@ export class KinwiseService {
       }
       return { alert: alertView(s, alert, { forResident: true }), message, caregiverName };
     });
+    if (askedCall) await this.scheduleFollowUp(actor.householdId, askedCall);
     const { caregiverName, ...view } = result;
     if (action !== 'call_family') return view;
     if (delivered) return { ...view, delivered };
@@ -825,6 +835,29 @@ export class KinwiseService {
       call: callView(state, now),
       serverTime: now.toISOString(),
     };
+  }
+
+  /** Ask to be woken just after the re-send is due. A failure is only logged: the TV poll still covers it. */
+  private async scheduleFollowUp(householdId: string, callId: string): Promise<void> {
+    if (!this.followUpScheduler) return;
+    try {
+      await this.followUpScheduler.schedule(householdId, callId, new Date(this.clock.now().getTime() + RESEND_AFTER_MS + 10_000));
+    } catch (err) {
+      console.error('[followup] could not schedule:', err instanceof Error ? err.message : 'unknown error');
+    }
+  }
+
+  /** Called by the scheduler: send the second message if nobody has confirmed. Safe to call any time, and many times. */
+  async followUp(householdId: string): Promise<void> {
+    let due = false;
+    try {
+      const { state, now } = await this.read(householdId);
+      due = resendDue(state, now);
+    } catch (err) {
+      if (err instanceof NotFoundError) return;
+      throw err;
+    }
+    if (due) await this.resendCall(householdId);
   }
 
   /** Second message to the caregiver. Re-checks inside the write, so many polls at once send exactly one. */
