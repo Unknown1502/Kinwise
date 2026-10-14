@@ -1,4 +1,5 @@
 import {
+  GetSubscriptionAttributesCommand,
   ListSubscriptionsByTopicCommand,
   PublishCommand,
   SNSClient,
@@ -10,7 +11,7 @@ import { CreateScheduleCommand, SchedulerClient } from '@aws-sdk/client-schedule
 import type { Contacts } from '../domain/types.js';
 
 /** Where Kinwise reaches a caregiver, looked up per notice. */
-export type ContactLookup = (householdId: string, caregiverId: string) => Promise<Contacts | undefined>;
+export type ContactLookup = (householdId: string, caregiverId: string) => Promise<(Contacts & { emailKey?: string }) | undefined>;
 
 /**
  * Privacy rule 2: a caregiver notice carries a signal, never content. No
@@ -56,11 +57,13 @@ export class SnsNotifier implements Notifier {
     private readonly topicArn: string,
     private readonly ackUrl: (notice: CaregiverNotice) => string | undefined = () => undefined,
     private readonly client = new SNSClient({}),
+    private readonly lookup?: ContactLookup,
   ) {}
 
   async notify(notice: CaregiverNotice): Promise<boolean> {
     const needsAnswer = notice.kind === 'call_request';
     const ack = needsAnswer ? this.ackUrl(notice) : undefined;
+    const emailKey = (await this.lookup?.(notice.householdId, notice.caregiverId))?.emailKey ?? 'none';
     // One call sends up to three e-mails within seconds; only one needs the caregiver to do something, so say which.
     await this.client.send(
       new PublishCommand({
@@ -78,6 +81,8 @@ export class SnsNotifier implements Notifier {
           householdId: { DataType: 'String', StringValue: notice.householdId },
           // A caregiver's own e-mail subscription filters on this, so each caregiver gets only their notices.
           caregiverId: { DataType: 'String', StringValue: notice.caregiverId },
+          // Only the subscription made for the caregiver's CURRENT address carries this key in its filter.
+          emailKey: { DataType: 'String', StringValue: emailKey },
         },
       }),
     );
@@ -126,11 +131,12 @@ export class SnsContactSync {
     private readonly client: SNSClient = new SNSClient({}),
   ) {}
 
-  async syncEmail(_householdId: string, memberId: string, oldEmail: string | undefined, newEmail: string | undefined): Promise<void> {
+  async syncEmail(householdId: string, memberId: string, oldEmail: string | undefined, newEmail: string | undefined, newKey?: string): Promise<void> {
     if (oldEmail) {
       for (const sub of await this.list()) {
-        // A subscription still waiting for confirmation has no ARN to remove; AWS drops it after three days.
-        if (sub.Protocol === 'email' && sub.Endpoint === oldEmail && sub.SubscriptionArn?.startsWith('arn:')) {
+        // A subscription still waiting for confirmation has no ARN to remove; AWS drops it after three days, and its key can no
+        // longer match anything we publish, so confirming it late shows its owner nothing.
+        if (sub.Protocol === 'email' && sub.Endpoint === oldEmail && sub.SubscriptionArn?.startsWith('arn:') && (await this.isOwnedBy(sub.SubscriptionArn, householdId, memberId))) {
           await this.client.send(new UnsubscribeCommand({ SubscriptionArn: sub.SubscriptionArn }));
         }
       }
@@ -141,10 +147,21 @@ export class SnsContactSync {
           TopicArn: this.topicArn,
           Protocol: 'email',
           Endpoint: newEmail,
-          Attributes: { FilterPolicy: JSON.stringify({ caregiverId: [memberId] }) },
+          Attributes: { FilterPolicy: JSON.stringify({ caregiverId: [memberId], householdId: [householdId], ...(newKey ? { emailKey: [newKey] } : {}) }) },
           ReturnSubscriptionArn: true,
         }),
       );
+    }
+  }
+
+  /** Only remove a subscription whose filter says it is this caregiver's in this household (the address alone proves nothing). */
+  private async isOwnedBy(subscriptionArn: string, householdId: string, memberId: string): Promise<boolean> {
+    const out = await this.client.send(new GetSubscriptionAttributesCommand({ SubscriptionArn: subscriptionArn }));
+    try {
+      const policy = JSON.parse(out.Attributes?.FilterPolicy ?? '{}') as { caregiverId?: string[]; householdId?: string[] };
+      return !!policy.caregiverId?.includes(memberId) && !!policy.householdId?.includes(householdId);
+    } catch {
+      return false;
     }
   }
 
@@ -163,7 +180,7 @@ export class SnsContactSync {
 /** One-time EventBridge Scheduler schedules that invoke the hub itself, then delete themselves. */
 export class EventBridgeFollowUp {
   private readonly client: SchedulerClient;
-  constructor(private readonly opts: { roleArn: string; targetArn: string; client?: SchedulerClient }) {
+  constructor(private readonly opts: { roleArn: string; targetArn: string; sign: (householdId: string, callId: string) => string; client?: SchedulerClient }) {
     this.client = opts.client ?? new SchedulerClient({});
   }
 
@@ -177,7 +194,7 @@ export class EventBridgeFollowUp {
         ScheduleExpressionTimezone: 'UTC',
         FlexibleTimeWindow: { Mode: 'OFF' },
         ActionAfterCompletion: 'DELETE',
-        Target: { Arn: this.opts.targetArn, RoleArn: this.opts.roleArn, Input: JSON.stringify({ source: 'kinwise.followup', householdId }) },
+        Target: { Arn: this.opts.targetArn, RoleArn: this.opts.roleArn, Input: JSON.stringify({ source: 'kinwise.followup', householdId, callId, sig: this.opts.sign(householdId, callId) }) },
       }),
     );
   }

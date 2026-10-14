@@ -28,10 +28,12 @@ const notice = (over: Partial<CaregiverNotice> = {}): CaregiverNotice => ({
 
 class FakeSync implements ContactSync {
   readonly calls: Array<{ memberId: string; oldEmail?: string; newEmail?: string }> = [];
+  readonly keys: Array<string | undefined> = [];
   fail = false;
-  async syncEmail(_householdId: string, memberId: string, oldEmail: string | undefined, newEmail: string | undefined) {
+  async syncEmail(_householdId: string, memberId: string, oldEmail: string | undefined, newEmail: string | undefined, newKey?: string) {
     if (this.fail) throw new Error('sns down');
     this.calls.push({ memberId, oldEmail, newEmail });
+    this.keys.push(newKey);
   }
 }
 
@@ -101,6 +103,37 @@ describe('each caregiver keeps their own contacts', () => {
       { memberId: 'priya', oldEmail: undefined, newEmail: 'a@example.com' },
       { memberId: 'priya', oldEmail: 'a@example.com', newEmail: 'b@example.com' },
     ]);
+  });
+
+  it('refuses an e-mail address that another family member already uses', async () => {
+    await ctx.service.setContacts(ravi, { email: 'shared@example.com' });
+    await expect(ctx.service.setContacts(meera, { email: 'Shared@Example.com' })).rejects.toThrow(/already used by another family member/i);
+    expect(ctx.sync.calls).toHaveLength(1); // only Ravi's
+  });
+
+  it('gives every new address a fresh key, so an old subscription can never see the new notices', async () => {
+    await ctx.service.setContacts(meera, { email: 'a@example.com' });
+    ctx.clock.t = new Date(ctx.clock.t.getTime() + 61_000);
+    await ctx.service.setContacts(meera, { email: 'b@example.com' });
+    expect(ctx.sync.keys[0]).toMatch(/^[\w-]{8,}$/);
+    expect(ctx.sync.keys[1]).toMatch(/^[\w-]{8,}$/);
+    expect(ctx.sync.keys[0]).not.toBe(ctx.sync.keys[1]);
+    expect((await ctx.service.contactsFor(HH, 'priya'))?.emailKey).toBe(ctx.sync.keys[1]);
+    expect(await ctx.service.getContacts(meera)).not.toHaveProperty('emailKey'); // internal: never shown to the caregiver
+  });
+
+  it('claims the one-a-minute gate before it calls SNS, so two parallel saves make one subscription', async () => {
+    const results = await Promise.allSettled([
+      ctx.service.setContacts(meera, { email: 'a@example.com' }),
+      ctx.service.setContacts(meera, { email: 'b@example.com' }),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(ctx.sync.calls).toHaveLength(1);
+  });
+
+  it('does not use up the minute on input that is refused', async () => {
+    await expect(ctx.service.setContacts(meera, { email: 'nope' })).rejects.toBeInstanceOf(ValidationError);
+    await expect(ctx.service.setContacts(meera, { email: 'ok@example.com' })).resolves.toBeDefined();
   });
 
   it('says so when the e-mail could not be set up, and still keeps the other contacts', async () => {
@@ -198,6 +231,8 @@ describe('notices reach each caregiver on their own channels', () => {
 });
 
 describe('SnsContactSync: e-mail routed by a filter policy', () => {
+  const own = JSON.stringify({ caregiverId: ['priya'], householdId: [HH], emailKey: ['OLDKEY'] });
+  const theirs = JSON.stringify({ caregiverId: ['ravi'], householdId: [HH], emailKey: ['RAVIKEY'] });
   it('subscribes with a policy on the caregiver id, after removing the old confirmed subscription', async () => {
     const sent: Array<{ name: string; input: Record<string, any> }> = [];
     const client = {
@@ -208,28 +243,34 @@ describe('SnsContactSync: e-mail routed by a filter policy', () => {
             Subscriptions: [
               { Protocol: 'email', Endpoint: 'old@example.com', SubscriptionArn: 'arn:aws:sns:us-east-1:1:t:abc' },
               { Protocol: 'email', Endpoint: 'old@example.com', SubscriptionArn: 'PendingConfirmation' },
+              { Protocol: 'email', Endpoint: 'old@example.com', SubscriptionArn: 'arn:aws:sns:us-east-1:1:t:ravi' }, // same address, another caregiver
               { Protocol: 'email', Endpoint: 'other@example.com', SubscriptionArn: 'arn:aws:sns:us-east-1:1:t:def' },
             ],
           };
         }
+        if (cmd.constructor.name === 'GetSubscriptionAttributesCommand') {
+          return { Attributes: { FilterPolicy: cmd.input.SubscriptionArn.endsWith(':ravi') ? theirs : own } };
+        }
         return {};
       },
     } as any;
-    await new SnsContactSync('arn:aws:sns:us-east-1:1:t', client).syncEmail(HH, 'priya', 'old@example.com', 'new@example.com');
+    await new SnsContactSync('arn:aws:sns:us-east-1:1:t', client).syncEmail(HH, 'priya', 'old@example.com', 'new@example.com', 'NEWKEY');
+    // only the subscription that is hers: the one for the same address that belongs to Ravi stays
     expect(sent.filter((s) => s.name === 'UnsubscribeCommand').map((s) => s.input.SubscriptionArn)).toEqual(['arn:aws:sns:us-east-1:1:t:abc']);
     const sub = sent.find((s) => s.name === 'SubscribeCommand')!.input;
     expect(sub).toMatchObject({ Protocol: 'email', Endpoint: 'new@example.com', TopicArn: 'arn:aws:sns:us-east-1:1:t' });
-    expect(JSON.parse(sub.Attributes.FilterPolicy)).toEqual({ caregiverId: ['priya'] });
+    expect(typeof sub.Attributes.FilterPolicy).toBe('string'); // SNS wants the policy as a JSON string
+    expect(JSON.parse(sub.Attributes.FilterPolicy)).toEqual({ caregiverId: ['priya'], householdId: [HH], emailKey: ['NEWKEY'] });
   });
 
   it('only removes when there is nothing new, and only subscribes when there is nothing old', async () => {
     const sent: string[] = [];
     const client = { send: async (cmd: { constructor: { name: string } }) => { sent.push(cmd.constructor.name); return { Subscriptions: [] }; } } as any;
     const sync = new SnsContactSync('arn:aws:sns:us-east-1:1:t', client);
-    await sync.syncEmail(HH, 'priya', undefined, 'new@example.com');
+    await sync.syncEmail(HH, 'priya', undefined, 'new@example.com', 'K');
     expect(sent).toEqual(['SubscribeCommand']);
     sent.length = 0;
-    await sync.syncEmail(HH, 'priya', 'old@example.com', undefined);
+    await sync.syncEmail(HH, 'priya', 'old@example.com', undefined, undefined);
     expect(sent).toEqual(['ListSubscriptionsByTopicCommand']);
   });
 });

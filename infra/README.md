@@ -62,7 +62,7 @@ Every message carries only the title and body of the notice, and a call request 
 Opening it shows one button; pressing **I'm calling now** puts a note from Meera on Asha's TV.
 
 **When nobody answers.** "Delivered" only means a channel accepted the message, not that a person read it, so Kinwise keeps asking.
-The moment Call Meera is pressed the hub creates a **one-time EventBridge Scheduler schedule** that wakes the hub about 2 minutes later;
+The moment Call Meera is pressed the hub creates a **one-time EventBridge Scheduler schedule** that wakes the hub about 2 minutes later (EventBridge Scheduler is accurate to within about a minute: in a live test the second message went out at 2 minutes 48 seconds);
 if nobody has confirmed by then it sends a second message ("Asha is still waiting for you", the same confirm link). This works with the TV
 off. The TV's own polling is only a backup if the schedule could not be created (`-c followUp=false` turns the schedules off). Exactly one
 second message is sent, however many times the schedule and the TV both ask. The TV's status chip turns amber ("Meera hasn't answered
@@ -80,13 +80,13 @@ curl -X PUT $HUB/caregiver/contacts -H "authorization: Bearer <caregiver token>"
 
 - **E-mail** is subscribed to the alert topic with a filter on that caregiver's id, so a second caregiver gets only their own notices.
   AWS sends the address a "Confirm subscription" e-mail; until it is clicked nothing arrives. The hub keeps an e-mail only if it
-  could subscribe it. Changing it removes the old confirmed subscription. (A subscription added by hand without a filter, such as one
+  could subscribe it. Changing it removes the old confirmed subscription. (Each address also gets a random key in the subscription's filter, so a subscription for an address the caregiver has since replaced never matches new notices, even if its owner confirms it late; see [`docs/security-review.md`](../docs/security-review.md).) (A subscription added by hand without a filter, such as one
   made with `aws sns subscribe`, receives every caregiver's notices: remove it once the caregiver has set their own.)
 - **SMS** goes through Amazon SNS: `+<country code><digits>`, one message with the signal and the confirm link. **A new AWS account is in
   the SMS sandbox:** you can text only numbers you have verified (`aws sns create-sms-sandbox-phone-number`, then
   `verify-sms-sandbox-phone-number` with the one-time code), at most $1 a month. Leaving the sandbox means requesting production
   access, and **sending to India also needs DLT registration** (a registered sender and template), so for a real family in India
-  use e-mail or WhatsApp. Turn SMS off with `-c sms=false`.
+  use e-mail or WhatsApp. SMS is **off by default** (`-c sms=true` turns it on): texting a phone number cannot be scoped to a resource, so it needs `sns:Publish` on every resource, and that is only worth granting when you mean to use SMS.
 - **WhatsApp** uses the caregiver's own number when set; the shared number in the Twilio secret is only a fallback.
 - Limits: a caregiver can change their contacts once a minute (so the API cannot be used to spam addresses with AWS confirmation
   mails or to run up SMS), numbers must be `+` and 8-15 digits, and ntfy is still one shared topic for the household.

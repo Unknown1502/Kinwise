@@ -21,6 +21,21 @@ function mac(key: string, payload: string): string {
   return createHmac('sha256', key).update(payload).digest('base64url').slice(0, 32);
 }
 
+/** The scheduled follow-up carries a signature over its household and call, so a bare JSON event cannot trigger it. */
+export function followUpKey(secret: string): string {
+  return createHmac('sha256', secret).update('kinwise-followup').digest('hex');
+}
+
+export function signFollowUp(key: string, householdId: string, callId: string): string {
+  return createHmac('sha256', key).update(`${householdId}|${callId}`).digest('base64url').slice(0, 32);
+}
+
+export function verifyFollowUp(key: string, householdId: string, callId: string, sig: unknown): boolean {
+  if (typeof sig !== 'string' || !householdId || !callId) return false;
+  const expected = signFollowUp(key, householdId, callId);
+  return sig.length === expected.length && timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+}
+
 export function signAck(key: string, claim: AckClaim, nowMs: number, ttlS = ACK_URL_TTL_S): string {
   const payload = Buffer.from(JSON.stringify({ h: claim.householdId, k: claim.callId, e: Math.floor(nowMs / 1000) + ttlS })).toString('base64url');
   return `${payload}.${mac(key, payload)}`;

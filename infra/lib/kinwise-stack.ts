@@ -30,7 +30,7 @@ export interface KinwiseStackProps extends StackProps {
   phonePush?: boolean;
   /** Wake the hub with one-time EventBridge Scheduler schedules for the 2-minute re-send, so it works with the TV off. Default true. */
   followUp?: boolean;
-  /** Send text messages (Amazon SNS SMS) to the numbers caregivers set. Costs money per message (account SMS spend limit applies). Default true. */
+  /** Send text messages (Amazon SNS SMS) to the numbers caregivers set. Off by default: it needs sns:Publish on every resource, which phone numbers force, and costs money per message. */
   sms?: boolean;
   /** Create the secret that holds Twilio WhatsApp credentials for caregiver messages (you fill it in). Default true. */
   whatsapp?: boolean;
@@ -201,7 +201,13 @@ export class KinwiseStack extends Stack {
     if (props.followUp !== false) {
       // EventBridge Scheduler invokes the hub directly (not through the API) at the moment a follow-up is due.
       const schedulerRole = new iam.Role(this, 'FollowUpSchedulerRole', {
-        assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com', { conditions: { StringEquals: { 'aws:SourceAccount': this.account } } }),
+        assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com', {
+          conditions: {
+            StringEquals: { 'aws:SourceAccount': this.account },
+            // Only this app's own follow-up schedules can use the role (confused-deputy protection).
+            ArnLike: { 'aws:SourceArn': `arn:aws:scheduler:${this.region}:${this.account}:schedule/default/kinwise-followup-*` },
+          },
+        }),
         description: 'Lets EventBridge Scheduler invoke the Kinwise hub for the caregiver follow-up',
       });
       hub.grantInvoke(schedulerRole);
@@ -225,8 +231,11 @@ export class KinwiseStack extends Stack {
     hub.addToRolePolicy(new iam.PolicyStatement({ actions: ['polly:SynthesizeSpeech'], resources: ['*'] }));
     alerts.grantPublish(hub);
     // A caregiver's e-mail is subscribed to this topic with a filter on their own id.
-    hub.addToRolePolicy(new iam.PolicyStatement({ actions: ['sns:Subscribe', 'sns:Unsubscribe', 'sns:ListSubscriptionsByTopic'], resources: [alerts.topicArn] }));
-    if (props.sms !== false) {
+    hub.addToRolePolicy(new iam.PolicyStatement({ actions: ['sns:Subscribe', 'sns:ListSubscriptionsByTopic'], resources: [alerts.topicArn] }));
+    // Removing or inspecting a subscription is authorized on the SUBSCRIPTION (the topic ARN plus ":<id>"); a grant on the bare
+    // topic ARN is denied (the IAM policy simulator showed it), which would make a confirmed address impossible to change.
+    hub.addToRolePolicy(new iam.PolicyStatement({ actions: ['sns:Unsubscribe', 'sns:GetSubscriptionAttributes'], resources: [`${alerts.topicArn}:*`] }));
+    if (props.sms === true) {
       // Publishing to a phone number has no resource to scope to, so it can only be granted on "*" (like Polly).
       // The account's monthly SMS spend limit is what bounds the cost.
       hub.addToRolePolicy(new iam.PolicyStatement({ actions: ['sns:Publish'], resources: ['*'] }));

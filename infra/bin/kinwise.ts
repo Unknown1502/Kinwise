@@ -20,7 +20,7 @@ const stack = new KinwiseStack(app, 'Kinwise', {
   allowedOrigins: list('allowedOrigins', 'http://localhost:5173,http://localhost:5174'),
   caregiverEmail: app.node.tryGetContext('caregiverEmail') as string | undefined,
   followUp: ctx('followUp', 'true') === 'true',
-  sms: ctx('sms', 'true') === 'true',
+  sms: ctx('sms', 'false') === 'true',
   whatsapp: ctx('whatsapp', 'true') === 'true',
   phonePush: ctx('phonePush', 'true') === 'true',
   ntfyServer: ctx('ntfyServer', 'https://ntfy.sh'),

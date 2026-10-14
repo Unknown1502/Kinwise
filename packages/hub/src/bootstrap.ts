@@ -7,7 +7,7 @@ import { createApp } from './http/app.js';
 import { demoHousehold } from './seed.js';
 import { KinwiseService, type Clock, type ContactSync } from './services/kinwise.js';
 import { PollySynth, type SpeechSynth } from './speech/speech.js';
-import { ackKey, signAck } from './services/ackLink.js';
+import { ackKey, followUpKey, signAck, signFollowUp, verifyFollowUp } from './services/ackLink.js';
 import { EventBridgeFollowUp, MultiNotifier, NtfyNotifier, OutboxNotifier, SmsNotifier, SnsContactSync, SnsNotifier, WhatsAppNotifier, type Notifier } from './services/notifier.js';
 import { DynamoStore } from './store/dynamo.js';
 import { MemoryStore } from './store/memory.js';
@@ -47,10 +47,12 @@ export async function bootstrap(input: HubConfig, inject: { speech?: SpeechSynth
   const outbox = new OutboxNotifier();
   const channels: Notifier[] = [outbox];
   const ackKeyValue = ackKey(config.ingestSecret);
+  const followKey = followUpKey(config.ingestSecret);
   // Without a public address a message still goes out, just without the confirm link.
   const ackUrl = (n: { callId?: string; householdId: string }) =>
     n.callId && config.publicBaseUrl ? `${config.publicBaseUrl}/ack/${signAck(ackKeyValue, { householdId: n.householdId, callId: n.callId }, Date.now())}` : undefined;
-  if (config.snsTopicArn) channels.push(new SnsNotifier(config.snsTopicArn, ackUrl));
+  const lookupContacts = (householdId: string, caregiverId: string) => service.contactsFor(householdId, caregiverId);
+  if (config.snsTopicArn) channels.push(new SnsNotifier(config.snsTopicArn, ackUrl, undefined, lookupContacts));
   if (config.ntfy?.topic) {
     channels.push(new NtfyNotifier({ server: config.ntfy.server, topic: config.ntfy.topic, fetch: inject.fetch, ackUrl }));
   }
@@ -62,7 +64,7 @@ export async function bootstrap(input: HubConfig, inject: { speech?: SpeechSynth
   const contactSync: ContactSync | undefined = config.snsTopicArn ? new SnsContactSync(config.snsTopicArn) : undefined;
   const service = new KinwiseService({ store, notifier, clock: inject.clock,
     contactSync,
-    followUp: config.followUp ? new EventBridgeFollowUp(config.followUp) : undefined,
+    followUp: config.followUp ? new EventBridgeFollowUp({ ...config.followUp, sign: (h, c) => signFollowUp(followKey, h, c) }) : undefined,
   });
 
   const deviceTokens: Record<string, Identity> = Object.fromEntries(
@@ -106,5 +108,5 @@ export async function bootstrap(input: HubConfig, inject: { speech?: SpeechSynth
   };
 
   const app = createApp({ config, service, verifier, concierge, outbox, resetDemo, speech });
-  return { app, service, store, outbox, verifier };
+  return { app, service, store, outbox, verifier, verifyFollowUp: (householdId: string, callId: string, sig: unknown) => verifyFollowUp(followKey, householdId, callId, sig) };
 }

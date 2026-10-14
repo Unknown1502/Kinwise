@@ -25,6 +25,8 @@ export interface Member {
   /** Where Kinwise reaches this caregiver. Only they set it, and only they and the notifiers read it. */
   contacts?: Contacts;
   contactsChangedAt?: string;
+  /** Random key stamped on this caregiver's e-mails and in the filter of their subscription. A new address gets a new key, so an old subscription (even one confirmed late) never matches new notices. */
+  emailKey?: string;
 }
 
 /** A caregiver's own channels. E-mail and SMS/WhatsApp numbers (E.164, "+919876543210") are personal data. */

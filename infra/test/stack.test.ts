@@ -81,21 +81,43 @@ describe('KinwiseStack', () => {
     }
   });
 
-  it('lets the hub subscribe a caregiver e-mail to the topic and send SMS, nothing broader on the topic', () => {
-    t.hasResourceProperties('AWS::IAM::Policy', {
-      PolicyDocument: {
-        Statement: Match.arrayWith([
-          Match.objectLike({ Action: ['sns:Subscribe', 'sns:Unsubscribe', 'sns:ListSubscriptionsByTopic'], Effect: 'Allow', Resource: Match.objectLike({ Ref: Match.stringLikeRegexp('CaregiverAlerts') }) }),
-          Match.objectLike({ Action: 'sns:Publish', Effect: 'Allow', Resource: '*' }),
-        ]),
-      },
-    });
-    t.hasResourceProperties('AWS::Lambda::Function', { Environment: { Variables: Match.objectLike({ SMS_ENABLED: 'true' }) } });
+  const statementsOf = (tpl: Template) =>
+    (Object.values(tpl.findResources('AWS::IAM::Policy')) as any[]).flatMap((p) => p.Properties.PolicyDocument.Statement as any[]);
+
+  it('lets the hub manage caregiver subscriptions where SNS really checks them: the topic to subscribe and list, the subscriptions to remove and inspect', () => {
+    const st = statementsOf(t);
+    const onTopic = st.find((x) => JSON.stringify(x.Action) === JSON.stringify(['sns:Subscribe', 'sns:ListSubscriptionsByTopic']));
+    expect(JSON.stringify(onTopic.Resource)).toContain('CaregiverAlerts');
+    expect(JSON.stringify(onTopic.Resource)).not.toContain(':*"'); // the topic itself
+    const onSubs = st.find((x) => JSON.stringify(x.Action) === JSON.stringify(['sns:Unsubscribe', 'sns:GetSubscriptionAttributes']));
+    // A subscription's ARN is the topic ARN plus ":<id>"; a policy on the bare topic ARN would deny Unsubscribe (found by the IAM policy simulator).
+    expect(JSON.stringify(onSubs.Resource)).toMatch(/CaregiverAlerts[^"]*"[^]*:\*/);
   });
+
+  it('grants SNS publish on every resource (needed for texting a phone number) only when SMS is switched on', () => {
+    const publishAll = (tpl: Template) => statementsOf(tpl).some((x) => x.Action === 'sns:Publish' && x.Resource === '*');
+    expect(publishAll(t)).toBe(false);
+    for (const fn of Object.values(t.findResources('AWS::Lambda::Function')) as any[]) expect(fn.Properties?.Environment?.Variables ?? {}).not.toHaveProperty('SMS_ENABLED');
+    const on = Template.fromStack(
+      new KinwiseStack(new App(), 'WithSms', {
+        env: { account: '123456789012', region: 'us-east-1' },
+        repoRoot,
+        authDomainPrefix: 'kinwise-test',
+        callbackUrls: ['http://localhost:5173/callback'],
+        allowedOrigins: ['http://localhost:5173'],
+        conciergeModelId: 'us.amazon.nova-2-lite-v1:0',
+        demoTimezone: 'America/New_York',
+        devRoutes: true,
+        sms: true,
+      }),
+    );
+    expect(publishAll(on)).toBe(true);
+    on.hasResourceProperties('AWS::Lambda::Function', { Environment: { Variables: Match.objectLike({ SMS_ENABLED: 'true' }) } });
+  }, 120_000);
 
   it('wakes the hub with one-time schedules: a role that can only invoke the hub, and a hub that can only create kinwise-followup schedules', () => {
     t.hasResourceProperties('AWS::IAM::Role', {
-      AssumeRolePolicyDocument: { Statement: Match.arrayWith([Match.objectLike({ Principal: { Service: 'scheduler.amazonaws.com' }, Condition: { StringEquals: { 'aws:SourceAccount': '123456789012' } } })]) },
+      AssumeRolePolicyDocument: { Statement: Match.arrayWith([Match.objectLike({ Principal: { Service: 'scheduler.amazonaws.com' }, Condition: { StringEquals: { 'aws:SourceAccount': '123456789012' }, ArnLike: { 'aws:SourceArn': Match.stringLikeRegexp('schedule/default/kinwise-followup-[*]$') } } })]) },
     });
     const statements = (Object.values(t.findResources('AWS::IAM::Policy')) as any[]).flatMap((p) => p.Properties.PolicyDocument.Statement as any[]);
     const create = statements.find((x) => x.Action === 'scheduler:CreateSchedule');

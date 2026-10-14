@@ -130,3 +130,15 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
 - **Suggestion:** say on the sandbox page that code needs a Content template, and say so at the moment of the 21654 error; let the trial account create `twilio/text` templates for the sandbox; document that `queued` is not `delivered`.
 - **What we did:** kept the WhatsApp sender in the code (it works on a paid Twilio account or can be pointed at Meta's Cloud API), and use e-mail through SNS for the demo.
 
+### 16. EventBridge Scheduler one-time schedules fire late, and the docs do not say by how much (🟡, first-hand, 2026-10-14)
+- **Task:** wake a Lambda about 2 minutes after a button press, so a follow-up does not depend on a device polling.
+- **Friction:** a schedule created for `at(HH:MM:SS)` 130 seconds ahead fired after 168 seconds. `at()` accepts seconds, but the service is evidently only accurate to within about a minute, and the console, the API reference and the SDK types do not state a tolerance. Everything else about one-time schedules worked well: `ActionAfterCompletion: DELETE` cleaned up after itself, and the invoke role needed only `lambda:InvokeFunction`.
+- **Minutes lost:** ~10 (checking whether our code or the service was late).
+- **Suggestion:** state the delivery tolerance next to the `at()` expression, and say that second-level precision is not a guarantee.
+
+### 17. Browser speech recognition under automation: the microphone works, the recogniser does not (🟡, first-hand, 2026-10-14)
+- **Task:** test a hands-free "Alexa" wake word end to end without a person speaking.
+- **Friction:** Edge started under Playwright with a fake microphone file hears it correctly (`audiostart`, `soundstart`, `speechstart` all fire), then `webkitSpeechRecognition` reports `error: network` and never returns a transcript, because the cloud recogniser is not reachable from an automation profile. The error is the same as for a real network outage, so it is easy to chase the wrong cause.
+- **Minutes lost:** ~25.
+- **Suggestion:** give the Web Speech API a distinct error for "recogniser service unavailable", or allow an on-device recogniser to be selected in test builds. We test the wake-word parsing as pure functions and ask a person to try it once in a normal browser.
+

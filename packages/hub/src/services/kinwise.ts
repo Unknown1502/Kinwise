@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { decideOnVisitor, isPrivacyHour } from '../domain/decide.js';
 import { closeRiskWindow, isWindowActive, updateRiskWindow } from '../domain/risk.js';
 import { screen } from '../domain/screening.js';
@@ -146,7 +146,7 @@ export function adviceFor(level: RiskLevel, categories: readonly SignalCategory[
 
 /** Subscribes a caregiver's e-mail to their own notices (and removes the old one). Absent where there is no SNS topic. */
 export interface ContactSync {
-  syncEmail(householdId: string, memberId: string, oldEmail: string | undefined, newEmail: string | undefined): Promise<void>;
+  syncEmail(householdId: string, memberId: string, oldEmail: string | undefined, newEmail: string | undefined, newKey?: string): Promise<void>;
 }
 
 /** Wakes the hub up later (EventBridge Scheduler) so a follow-up does not depend on the TV polling. */
@@ -752,9 +752,10 @@ export class KinwiseService {
   }
 
   /** For the notifiers: where to reach this caregiver. No access logging, nothing leaves the hub except in a notice. */
-  async contactsFor(householdId: string, memberId: string): Promise<Contacts | undefined> {
+  async contactsFor(householdId: string, memberId: string): Promise<(Contacts & { emailKey?: string }) | undefined> {
     const { state } = await this.read(householdId);
-    return state.household.members.find((m) => m.id === memberId)?.contacts;
+    const m = state.household.members.find((x) => x.id === memberId);
+    return m?.contacts ? { ...m.contacts, ...(m.emailKey ? { emailKey: m.emailKey } : {}) } : m?.emailKey ? { emailKey: m.emailKey } : undefined;
   }
 
   /**
@@ -762,7 +763,7 @@ export class KinwiseService {
    * message), and kept only if that worked, so nothing is ever stored that nothing is subscribed to.
    */
   async setContacts(actor: Identity, patch: ContactPatch): Promise<ContactsResult> {
-    const { state, now } = await this.read(actor.householdId);
+    const { state } = await this.read(actor.householdId);
     const me = this.caregiverMember(state, actor);
     const next: Contacts = { ...(me.contacts ?? {}) };
     for (const kind of ['email', 'sms', 'whatsapp'] as const) {
@@ -771,15 +772,27 @@ export class KinwiseService {
       if (v === null || v.trim() === '') delete next[kind];
       else next[kind] = checkContact(kind, v);
     }
-    if (me.contactsChangedAt && now.getTime() - Date.parse(me.contactsChangedAt) < CONTACT_CHANGE_GAP_MS) {
-      throw new ValidationError('Please wait a minute before changing contacts again');
+    // One address, one family member: removing someone's old subscription must never remove another person's.
+    if (next.email && state.household.members.some((m) => m.id !== me.id && m.contacts?.email?.toLowerCase() === next.email!.toLowerCase())) {
+      throw new ValidationError('That e-mail address is already used by another family member');
     }
+    // Claim the one-a-minute gate BEFORE touching SNS, so two parallel saves cannot both subscribe.
+    await this.mutate(actor.householdId, (s2, at) => {
+      const m = this.caregiverMember(s2, actor);
+      if (m.contactsChangedAt && at.getTime() - Date.parse(m.contactsChangedAt) < CONTACT_CHANGE_GAP_MS) {
+        throw new ValidationError('Please wait a minute before changing contacts again');
+      }
+      m.contactsChangedAt = at.toISOString();
+    });
     const oldEmail = me.contacts?.email;
+    let newKey = me.emailKey;
     let email: ContactsResult['email'] = 'unchanged';
     if (next.email !== oldEmail) {
+      const candidate = next.email ? randomBytes(9).toString('base64url') : undefined;
       try {
-        await this.contactSync?.syncEmail(actor.householdId, me.id, oldEmail, next.email);
+        await this.contactSync?.syncEmail(actor.householdId, me.id, oldEmail, next.email, candidate);
         email = next.email ? 'confirmation_sent' : 'removed';
+        newKey = candidate;
       } catch (err) {
         console.error('[contacts] e-mail subscription failed:', err instanceof Error ? err.message : 'unknown error');
         email = 'failed';
@@ -787,11 +800,20 @@ export class KinwiseService {
         else delete next.email;
       }
     }
-    await this.mutate(actor.householdId, (s2, at) => {
-      const m = this.caregiverMember(s2, actor);
-      m.contacts = next;
-      m.contactsChangedAt = at.toISOString();
-    });
+    try {
+      await this.mutate(actor.householdId, (s2) => {
+        const m = this.caregiverMember(s2, actor);
+        m.contacts = next;
+        if (newKey) m.emailKey = newKey;
+        else delete m.emailKey;
+      });
+    } catch (err) {
+      // The subscription changed but the record did not: put the subscription back, best effort, then say it failed.
+      if (email === 'confirmation_sent' || email === 'removed') {
+        await this.contactSync?.syncEmail(actor.householdId, me.id, next.email, oldEmail, me.emailKey).catch(() => undefined);
+      }
+      throw err;
+    }
     return { contacts: next, email };
   }
 
@@ -847,23 +869,23 @@ export class KinwiseService {
     }
   }
 
-  /** Called by the scheduler: send the second message if nobody has confirmed. Safe to call any time, and many times. */
-  async followUp(householdId: string): Promise<void> {
+  /** Called by the scheduler for ONE call: send its second message if nobody has confirmed. Safe to call any time, and many times. */
+  async followUp(householdId: string, callId: string): Promise<void> {
     let due = false;
     try {
       const { state, now } = await this.read(householdId);
-      due = resendDue(state, now);
+      due = state.callRequest?.id === callId && resendDue(state, now);
     } catch (err) {
       if (err instanceof NotFoundError) return;
       throw err;
     }
-    if (due) await this.resendCall(householdId);
+    if (due) await this.resendCall(householdId, callId);
   }
 
   /** Second message to the caregiver. Re-checks inside the write, so many polls at once send exactly one. */
-  private async resendCall(householdId: string): Promise<void> {
+  private async resendCall(householdId: string, callId?: string): Promise<void> {
     await this.mutate(householdId, (s, now, pending) => {
-      if (!resendDue(s, now)) return;
+      if ((callId && s.callRequest?.id !== callId) || !resendDue(s, now)) return;
       s.callRequest!.resentAt = now.toISOString();
       const residentName = resident(s).name;
       for (const c of caregivers(s)) {

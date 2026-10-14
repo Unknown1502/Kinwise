@@ -241,6 +241,18 @@ describe('SnsNotifier (email to the caregiver)', () => {
     expect(call.sent[0]!.Message).not.toMatch(/No action needed now/);
   });
 
+  it('stamps the e-mail with the caregiver key, so only the current subscription matches it', async () => {
+    const sent: Array<Record<string, any>> = [];
+    const client = { send: async (cmd: { input: Record<string, any> }) => void sent.push(cmd.input) } as any;
+    const sns = new SnsNotifier('arn:aws:sns:us-east-1:1:t', () => undefined, client, async () => ({ emailKey: 'KEY9' }) as any);
+    await sns.notify(notice());
+    expect(sent[0]!.MessageAttributes.emailKey.StringValue).toBe('KEY9');
+    expect(sent[0]!.MessageAttributes.caregiverId.StringValue).toBe('priya');
+    const none = new SnsNotifier('arn:aws:sns:us-east-1:1:t', () => undefined, client, async () => undefined);
+    await none.notify(notice());
+    expect(sent[1]!.MessageAttributes.emailKey.StringValue).toBe('none');
+  });
+
   it('has no link on a Pause or a warning, and still says only the signal', async () => {
     const { sent } = await sendAll(notice({ kind: 'pause', callId: undefined }), () => 'https://hub.example/ack/x');
     expect(sent[0]!.Message).not.toContain('https://');
