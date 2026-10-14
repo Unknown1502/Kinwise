@@ -232,9 +232,11 @@ export class KinwiseStack extends Stack {
     alerts.grantPublish(hub);
     // A caregiver's e-mail is subscribed to this topic with a filter on their own id.
     hub.addToRolePolicy(new iam.PolicyStatement({ actions: ['sns:Subscribe', 'sns:ListSubscriptionsByTopic'], resources: [alerts.topicArn] }));
-    // Removing or inspecting a subscription is authorized on the SUBSCRIPTION (the topic ARN plus ":<id>"); a grant on the bare
-    // topic ARN is denied (the IAM policy simulator showed it), which would make a confirmed address impossible to change.
-    hub.addToRolePolicy(new iam.PolicyStatement({ actions: ['sns:Unsubscribe', 'sns:GetSubscriptionAttributes'], resources: [`${alerts.topicArn}:*`] }));
+    // SNS has no resource-level permissions for these two actions: IAM evaluates them against "*", so a grant scoped to the topic or to
+    // its subscriptions never matches (the IAM policy simulator shows it; AWS also says Unsubscribe is not restricted by IAM). Both are
+    // needed so the hub can check that a subscription is a caregiver's own before removing it. The hub only ever names subscriptions
+    // it found by listing OUR topic.
+    hub.addToRolePolicy(new iam.PolicyStatement({ actions: ['sns:GetSubscriptionAttributes', 'sns:Unsubscribe'], resources: ['*'] }));
     if (props.sms === true) {
       // Publishing to a phone number has no resource to scope to, so it can only be granted on "*" (like Polly).
       // The account's monthly SMS spend limit is what bounds the cost.

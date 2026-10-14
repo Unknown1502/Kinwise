@@ -84,14 +84,14 @@ describe('KinwiseStack', () => {
   const statementsOf = (tpl: Template) =>
     (Object.values(tpl.findResources('AWS::IAM::Policy')) as any[]).flatMap((p) => p.Properties.PolicyDocument.Statement as any[]);
 
-  it('lets the hub manage caregiver subscriptions where SNS really checks them: the topic to subscribe and list, the subscriptions to remove and inspect', () => {
+  it('lets the hub manage caregiver subscriptions: topic-scoped to subscribe and list, and "*" for the two actions SNS cannot scope', () => {
     const st = statementsOf(t);
     const onTopic = st.find((x) => JSON.stringify(x.Action) === JSON.stringify(['sns:Subscribe', 'sns:ListSubscriptionsByTopic']));
     expect(JSON.stringify(onTopic.Resource)).toContain('CaregiverAlerts');
     expect(JSON.stringify(onTopic.Resource)).not.toContain(':*"'); // the topic itself
-    const onSubs = st.find((x) => JSON.stringify(x.Action) === JSON.stringify(['sns:Unsubscribe', 'sns:GetSubscriptionAttributes']));
-    // A subscription's ARN is the topic ARN plus ":<id>"; a policy on the bare topic ARN would deny Unsubscribe (found by the IAM policy simulator).
-    expect(JSON.stringify(onSubs.Resource)).toMatch(/CaregiverAlerts[^"]*"[^]*:\*/);
+    const onSubs = st.find((x) => JSON.stringify(x.Action) === JSON.stringify(['sns:GetSubscriptionAttributes', 'sns:Unsubscribe']));
+    // SNS has no resource-level permissions for these: a scoped grant would never match (verified with the IAM policy simulator).
+    expect(onSubs.Resource).toBe('*');
   });
 
   it('grants SNS publish on every resource (needed for texting a phone number) only when SMS is switched on', () => {
