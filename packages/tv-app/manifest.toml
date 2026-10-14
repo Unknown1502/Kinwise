@@ -116,6 +116,22 @@ id = "/com.amazon.vega.os@IVega_1_2"
 ## ------------------------------------------------------------------------------
 ## Offers
 ## ------------------------------------------------------------------------------
+
+[[needs.module]]
+id = "/com.amazon.kepler.kepler_media_controls_1@IKeplerMediaControls_0"
+
+[[needs.module]]
+id = "/com.amazon.kepler.keplermediadescriptor_1@IKeplermediadescriptor_1"
+
+[[needs.module]]
+id = "/com.amazon.kepler.keplerscript_2@IKeplerScript_1"
+
+[[needs.module]]
+id = "/com.amazon.kepler.w3cmedia_2@IW3cmedia_1"
+
+
+
+
 [offers]
 # Required for GIPC SR
 [[offers.service]]
