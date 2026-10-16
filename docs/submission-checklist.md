@@ -1,5 +1,7 @@
 # Submission checklist (Amazon AppDev 2026, deadline Oct 23, 12:00 PM PT)
 
+> Start with [`judging-evidence.md`](judging-evidence.md): the requirements read from the official rules on 2026-10-16, the blockers in order, and the readiness verdict. Then [`devpost-draft.md`](devpost-draft.md) (text, product feedback, open-source fields), [`demo-storyboard.md`](demo-storyboard.md) (the 2:40 plan) and [`safety-test-coverage.md`](safety-test-coverage.md).
+
 Every rule requirement, the evidence in this repo, and its status. ✅ done · 🔄 in progress · ⬜ to do (team)
 
 ## Eligibility and repository

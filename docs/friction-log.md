@@ -1,6 +1,6 @@
 # Friction log
 
-Real friction hit while building Kinwise (Amazon AppDev 2026). Each entry records the task, the steps, expected vs actual, severity, minutes lost, the workaround and a suggestion. **First-hand** entries happened to us; **reported** entries come from other developers and still need to be reproduced before submission.
+Real friction hit while building Kinwise (Amazon AppDev 2026). Each entry records the task, the steps, expected vs actual, severity, the workaround and a suggestion (minutes lost where we measured it). Every entry here happened to us (first-hand) and is described as it occurred; where an entry says "from the docs" it comes from reading the documentation, not from a failed run. These are the entries to paste into the optional friction-log fields of the Devpost form.
 
 Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
 
@@ -27,29 +27,40 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
 - **Task:** `uv sync` with `strands-agents>=1.57` and `mcp>=2.3`.
 - **Actual:** unsatisfiable: `strands-agents` requires `mcp>=1.23,<2.2`.
 - **Workaround:** let Strands choose the MCP SDK version (2.1.1).
+- **Steps:** added `strands-agents>=1.57` and `mcp>=2.3` to `pyproject.toml` and ran `uv sync`.
+- **Expected:** the two requirements resolve together.
 - **Suggestion:** widen the pin, or document the supported MCP SDK range.
 
 ### 4. AgentCore code deployment needs Linux ARM64 wheels (🟡, first-hand)
 - **Task:** deploy the Python concierge to AgentCore Runtime from Windows without Docker.
 - **Workaround that worked:** `uv pip install --target build/package --python-platform aarch64-manylinux_2_28 --python-version 3.12 --only-binary :all:`, then `AgentRuntimeArtifact.fromCodeAsset` in CDK (see `agents/concierge/scripts/package.py`).
+- **Steps:** tried to package the concierge for AgentCore Runtime from a Windows laptop with no Docker.
+- **Expected:** a documented way to build an ARM64 code bundle on any OS.
+- **Actual:** the guides we found assume Docker buildx or a macOS/Linux ARM host; a bundle built on Windows would carry the wrong wheels.
 - **Suggestion:** put this cross-platform recipe in the AgentCore docs. Most guides assume Docker buildx or macOS.
 
 ### 5. Alexa+ MCP add-on toolkit isn't available to participants (🟠, first-hand)
 - **Task:** verify our MCP server against real Alexa+.
 - **Actual:** the MCP Toolkit, CLI and Web Simulator are partner-only (hackathon FAQ).
 - **Workaround:** implemented the published Alexa+ contract (two-tier OAuth scopes, RFC 9728, 401 without `WWW-Authenticate`, <500 ms). Wrote a conformance script and a simulated surface.
+- **Steps:** looked for the MCP Toolkit, CLI and Web Simulator named in the Alexa+ material, then read the hackathon FAQ.
+- **Expected:** a way for participants to test an add-on against Alexa+.
 - **Suggestion:** a public sandbox or "contract test" for Alexa+ MCP add-ons, even without live devices.
 
 ### 6. No overlay or alert API for third-party Fire TV apps (🟠, first-hand, from the docs)
 - **Task:** show the Pause on the TV whatever is playing.
 - **Actual:** there is no documented API for Vega or Fire OS apps to raise a safety notice over other apps.
 - **Workaround:** Kinwise is the resident's ambient home channel. The Echo and the caregiver alert are backups.
+- **Steps:** searched the Vega and Fire OS documentation for an overlay, notification or full-screen-alert API.
+- **Expected:** a permissioned way for a safety app to raise a notice over whatever is playing.
 - **Suggestion:** a permissioned "household safety notice" API (user-granted, rate-limited) for accessibility and safety apps.
 
 ### 7. Ring Partner API exposes none of Ring's AI features (🟠, first-hand, from the docs)
 - **Task:** know *what* is at the door (a person or a package) without building our own vision.
 - **Actual:** Video Descriptions, Smart Alerts and Familiar Faces aren't available to partners, and there are no resident-facing announcements.
 - **Workaround:** sample a frame over WHEP and describe it neutrally with Nova 2 Lite.
+- **Steps:** read the Ring Partner API documentation and feature list for anything that tells a person from a package.
+- **Expected:** Ring's own detections (video descriptions, smart alerts) available to partners.
 - **Suggestion:** expose Video Descriptions (opt-in) and a "speak to the resident" chime action.
 
 ### 8. Ring Developer Playground: stored media and Python WebRTC decoding (🟠, first-hand, 2026-10-06, from India)
@@ -70,10 +81,18 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
 
 ### 9. MCP Apps cards are ~230 KB each (🟡, first-hand)
 - **Actual:** `@modelcontextprotocol/ext-apps` pulls zod and the core SDK into every single-file card.
+- **Task:** ship the Kinwise result cards as MCP Apps (`ui://` resources) built with `@modelcontextprotocol/ext-apps`.
+- **Steps:** bundled each card into a single HTML file and measured the output.
+- **Expected:** a card of a few tens of KB.
+- **Workaround:** accepted the size; the cards render correctly in the Echo simulator, Claude and VS Code.
 - **Suggestion:** a slim "view-only" App runtime for hosts that only push tool results.
 
 ### 10. Stateless MCP servers produce a console error in browser clients (🟡, first-hand)
 - **Actual:** the TS client opens the optional GET SSE stream, and a stateless server correctly answers 405, which still logs a browser console error.
+- **Task:** connect a browser MCP client (the Echo simulator, TypeScript SDK) to a stateless Streamable HTTP server.
+- **Steps:** opened the page and watched the console after `initialize`.
+- **Expected:** no console errors when the server is simply stateless.
+- **Workaround:** none needed: the 405 is the correct answer and the client carries on; we document it so reviewers do not read it as a bug.
 - **Suggestion:** the client could treat 405 on the GET stream as "not supported" silently.
 
 ### 11. AgentCore Runtime tracing fails a first deploy until X-Ray Transaction Search is enabled (🟠, first-hand, 2026-10-07)
@@ -81,6 +100,8 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
 - **Actual:** the stack rolled back. `AWS::Logs::Delivery` (Concierge/TracesDelivery) failed with *"X-Ray Delivery Destination is supported with CloudWatch Logs as a Trace Segment Destination. Please enable the CloudWatch Logs destination … UpdateTraceSegmentDestination"*. On a fresh account the X-Ray destination is `XRay`.
 - **Workaround:** a one-time account setup: a CloudWatch Logs resource policy for `xray.amazonaws.com` on `aws/spans`, then `aws xray update-trace-segment-destination --destination CloudWatchLogs`, then wait for `ACTIVE`. Tracing is now also a deploy flag (`-c tracing=false`).
 - **Minutes lost:** ~15, plus a rollback cycle.
+- **Steps:** `cdk deploy` of the stack with `agentcore.Runtime` and `tracingEnabled: true` on a fresh account.
+- **Expected:** the deploy succeeds, or says before deploying that the account setup is missing.
 - **Suggestion:** have the CDK construct (or `agentcore` CLI) check the destination at synth/deploy time and say how to enable it, or enable Transaction Search as part of the construct.
 
 ### 12. Vega Virtual Device works under WSL2, but the path there is undocumented (🟠, first-hand, 2026-10-07)
@@ -94,6 +115,9 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
   5. The Virtual Device process dies when the WSL session that started it exits, so `vega run-app` then reports *"No devices found"*.
   6. Generated vpkg names follow the package.json name (`tv-app_x86_64.vpkg`), not `appName`, unlike several docs examples.
 - **Minutes lost:** ~90, mostly the stalled download plus diagnosing WSL networking.
+- **Steps:** followed the Linux install guide inside Ubuntu 24.04 on WSL2, as in the numbered list below.
+- **Expected:** either a supported WSL2 path or a clear statement that it is unsupported.
+- **Workaround:** `apt install jq libjpeg62`, a manual `vega sdk install <version>` after the stalled download, `legacy-peer-deps=true`, and a script that keeps the WSL session alive while the Virtual Device runs.
 - **Suggestion:** document WSL2 as a supported (or "known to work") path, add `jq`/`libjpeg62` to the prerequisites, add retry and progress to SDK downloads, and offer a `--detach` option for `vega virtual-device start`.
 
 ### 13. Ring Developer Playground: no person scene, no way to choose a scene, one slow token at a time (🟠, first-hand, 2026-10-13, from India)
@@ -117,6 +141,9 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
   2. `vega run-app` issued right after the device appears in `vega device list` can fail with *"Cannot read properties of undefined (reading 'trim')"* (a CLI error, not a device error). Waiting about 30 seconds and retrying works. Our run-app scripts now retry.
   3. `vega device list` and `vega virtual-device status` can hang indefinitely while the emulator is still booting under memory pressure, and leave stuck `vda` child processes that block later commands.
 - **Minutes lost:** ~60 across several restarts.
+- **Steps:** stopped the Virtual Device uncleanly (WSL session ended or memory ran out), then restarted it and installed the app, as in the numbered list below.
+- **Expected:** the restart works, or the error says why it cannot.
+- **Workaround:** stop `qemu` and `vda`, delete the two stale lock files, `wsl --shutdown`, start again, and retry `vega run-app` once on the `trim` error.
 - **Suggestion:** have `vega virtual-device start` detect and clear stale lock files, print the contents of `virtual_device.err` when the device is unresponsive, and make `device list` and `status` time out with a clear message.
 
 ### 15. Twilio WhatsApp on a trial account: the sandbox accepts "join", then refuses to send (🟠, first-hand, 2026-10-13, from India)
@@ -127,6 +154,9 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
   3. The way out is a Content template. Creating one is refused on a trial account with code **20003**, *"This feature is not available on a Trial account"*, so a free account cannot send WhatsApp from code at all.
   4. Twilio's *"accepted"* answer means queued, not delivered. Other WhatsApp failures, for example the 24-hour window (error 63016), can arrive only in a later status callback, so a hub that trusts the first HTTP answer can tell the user a message was sent when it was not.
 - **Minutes lost:** ~45, mostly finding that the trial blocks the feature.
+- **Steps:** joined the Twilio WhatsApp sandbox, then sent a free-text message from code with the REST API; then tried to create a Content template.
+- **Expected:** the sandbox accepts a plain message to a number that joined it.
+- **Workaround:** kept the WhatsApp sender in the code for a paid account or Meta's Cloud API; the demo uses e-mail through SNS.
 - **Suggestion:** say on the sandbox page that code needs a Content template, and say so at the moment of the 21654 error; let the trial account create `twilio/text` templates for the sandbox; document that `queued` is not `delivered`.
 - **What we did:** kept the WhatsApp sender in the code (it works on a paid Twilio account or can be pointed at Meta's Cloud API), and use e-mail through SNS for the demo.
 
@@ -134,11 +164,17 @@ Severity: 🔴 blocking · 🟠 costly · 🟡 annoying
 - **Task:** wake a Lambda about 2 minutes after a button press, so a follow-up does not depend on a device polling.
 - **Friction:** a schedule created for `at(HH:MM:SS)` 130 seconds ahead fired after 168 seconds. `at()` accepts seconds, but the service is evidently only accurate to within about a minute, and the console, the API reference and the SDK types do not state a tolerance. Everything else about one-time schedules worked well: `ActionAfterCompletion: DELETE` cleaned up after itself, and the invoke role needed only `lambda:InvokeFunction`.
 - **Minutes lost:** ~10 (checking whether our code or the service was late).
+- **Steps:** created a one-time schedule (`at(...)` 130 s ahead, UTC, action after completion DELETE) targeting a Lambda, pressed the button, and polled until the second message appeared.
+- **Expected:** the schedule fires within a few seconds of its time.
+- **Workaround:** none needed: we arm the schedule 10 s after the 2-minute mark and keep the device poll as a backup trigger.
 - **Suggestion:** state the delivery tolerance next to the `at()` expression, and say that second-level precision is not a guarantee.
 
 ### 17. Browser speech recognition under automation: the microphone works, the recogniser does not (🟡, first-hand, 2026-10-14)
 - **Task:** test a hands-free "Alexa" wake word end to end without a person speaking.
 - **Friction:** Edge started under Playwright with a fake microphone file hears it correctly (`audiostart`, `soundstart`, `speechstart` all fire), then `webkitSpeechRecognition` reports `error: network` and never returns a transcript, because the cloud recogniser is not reachable from an automation profile. The error is the same as for a real network outage, so it is easy to chase the wrong cause.
 - **Minutes lost:** ~25.
+- **Steps:** started Edge under Playwright with `--use-fake-device-for-media-stream` and `--use-file-for-fake-audio-capture` playing a synthesized phrase, then called `webkitSpeechRecognition.start()` and logged its events.
+- **Expected:** a transcript of the phrase, or a clear error that the recogniser service cannot be reached.
+- **Workaround:** test the wake-word parsing as pure functions and ask a person to try the live microphone once in a normal browser.
 - **Suggestion:** give the Web Speech API a distinct error for "recogniser service unavailable", or allow an on-device recogniser to be selected in test builds. We test the wake-word parsing as pure functions and ask a person to try it once in a normal browser.
 

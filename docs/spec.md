@@ -4,7 +4,7 @@ Status: approved for build (2026-10-05). Owner: Kinwise team. Hackathon: Amazon 
 
 ## 1. Problem and promise
 
-Courier scams follow a two-step pattern. First, a caller posing as a bank, the FTC or the police convinces an older adult that their money is at risk. Then a "courier" comes to the home to collect cash or gold. Adults 60+ reported **$7.7B** in fraud losses to the FBI in 2025. In FBI Boston's courier-pickup cases, **about 98% of victims were over 60**.
+Courier scams follow a two-step pattern. First, a caller posing as a bank, the FTC or the police convinces an older adult that their money is at risk. Then a "courier" comes to the home to collect cash or gold. Adults 60+ reported **$7.7B** in fraud losses in 2025 (about 60% more than in 2024; FBI IC3 data as reported by AARP). In FBI Boston's 103 courier-pickup cases from 2023 to May 2025, **roughly 98% of the losses were reported by people over 60** (a share of losses, not of victims). Sources are linked in the README.
 
 No single device sees both steps. Kinwise joins them up. The signal from the conversation comes from what the resident tells Alexa. The signal from the door comes from Ring. When both line up, the resident's TV gently intervenes ("the Pause") and offers a one-press call to family.
 

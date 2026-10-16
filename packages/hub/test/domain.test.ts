@@ -199,4 +199,22 @@ describe('door decision (spec §5.6)', () => {
   it('shows a gentle card with no window', () => {
     expect(decideOnVisitor(ctx({ riskWindow: undefined }), event('14:41'), now)).toEqual({ kind: 'gentle' });
   });
+
+  describe('a door event must be fresh (a late event is about a visitor who has gone)', () => {
+    it('acts on an event up to five minutes old', () => {
+      expect(decideOnVisitor(ctx(), event('14:41'), at('14:45')).kind).toBe('pause');
+      expect(decideOnVisitor(ctx(), event('14:41'), at('14:46')).kind).toBe('pause'); // exactly five minutes
+    });
+    it('ignores one that is older: a retried webhook or a backlog after an outage must not light up the TV', () => {
+      expect(decideOnVisitor(ctx(), event('14:41'), at('14:47'))).toEqual({ kind: 'ignored', reason: 'stale_event' });
+      expect(decideOnVisitor(ctx(), event('14:41'), at('18:00'))).toEqual({ kind: 'ignored', reason: 'stale_event' });
+    });
+    it('allows a minute or two of clock difference, but not an event from the future', () => {
+      expect(decideOnVisitor(ctx(), event('14:41'), at('14:40')).kind).toBe('pause');
+      expect(decideOnVisitor(ctx(), event('14:41'), at('14:38'))).toEqual({ kind: 'ignored', reason: 'stale_event' });
+    });
+    it('keeps the privacy rules first: privacy time still wins over everything', () => {
+      expect(decideOnVisitor(ctx({ privacyHourUntil: '2026-10-08T23:00:00Z' }), event('14:41'), at('18:00'))).toEqual({ kind: 'ignored', reason: 'privacy_hour' });
+    });
+  });
 });

@@ -227,3 +227,41 @@ describe('KinwiseService — TV follow-ups', () => {
     expect(demoHousehold(new Date(), 'UTC', 'https://cdn.example/p.mp4').household.pauseMessage.videoUrl).toBe('https://cdn.example/p.mp4');
   });
 });
+
+describe('KinwiseService: the cases around the hero story', () => {
+  let ctx: ReturnType<typeof setup>;
+  beforeEach(async () => {
+    ctx = setup();
+    await ctx.service.createHousehold(demoHousehold(ctx.clock.now()));
+  });
+  const CALL = 'A man from the FTC said my accounts are compromised and I should withdraw it as gold. Do not tell my family.';
+
+  it('a suspicious call with no visitor afterwards: the family hears once, nothing pops up, and the watch lapses by itself', async () => {
+    const { service, clock, notifier } = ctx;
+    clock.t = local('10:20');
+    await service.checkCall(asha, { description: CALL });
+    expect(notifier.outbox.map((n) => n.kind)).toEqual(['risk_high']); // once, a signal only
+    expect((await service.tvState(tv)).activeAlert).toBeUndefined(); // no Pause without a visitor
+    expect((await service.tvState(tv)).today.safety.level).toBe('high');
+    clock.t = local('17:00'); // after the 6-hour window
+    const later = await service.tvState(tv);
+    expect(later.today.safety.level).toBe('none');
+    expect(later.activeAlert).toBeUndefined();
+    expect(notifier.outbox).toHaveLength(1);
+  });
+
+  it('a doorbell event that arrives hours late is ignored, with no alert and no message to the family', async () => {
+    const { service, clock, notifier } = ctx;
+    clock.t = local('10:20');
+    await service.checkCall(asha, { description: CALL });
+    const before = notifier.outbox.length;
+    clock.t = local('14:50'); // the visitor rang at 14:41 but the event only reaches the hub now
+    const late = await service.ingestVisitor(HH, { ...visitor('late-1', '14:41'), occurredAt: local('11:00').toISOString() });
+    expect(late.decision).toBe('ignored');
+    expect(late.alertId).toBeUndefined();
+    expect((await service.tvState(tv)).activeAlert).toBeUndefined();
+    expect(notifier.outbox).toHaveLength(before);
+    const fresh = await service.ingestVisitor(HH, visitor('fresh-1', '14:50'));
+    expect(fresh.decision).toBe('pause'); // a fresh one still works
+  });
+});
