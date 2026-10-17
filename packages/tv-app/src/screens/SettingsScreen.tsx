@@ -15,7 +15,7 @@ import {ToggleRow} from '../components/ToggleRow';
 import {consentItems} from '../logic/consentCopy';
 import {plural} from '../logic/copy';
 import {FOCUS, RADIUS, SAFE, colors, s, type} from '../theme/theme';
-import type {ConsentKey, ProposalDecision, TvStateView} from '../types';
+import type {ConsentKey, ProposalDecision, TvStateView, WatchChoice} from '../types';
 
 export interface SettingsScreenProps {
   state: TvStateView;
@@ -25,6 +25,8 @@ export interface SettingsScreenProps {
   onPrivacy: (minutes: number) => void;
   onDecide: (visitId: string, decision: ProposalDecision) => void;
   onCloseSafety: () => void;
+  /** Her answer to "turn on a safety watch?"; nothing starts until she chooses turn_on. */
+  onWatch: (choice: WatchChoice, offerId?: string) => void;
   onBack: () => void;
   /** Whether the TV reads visitors, messages and changes aloud. */
   voiceOn: boolean;
@@ -55,6 +57,7 @@ export function SettingsScreen({
   onPrivacy,
   onDecide,
   onCloseSafety,
+  onWatch,
   onBack,
   voiceOn,
   onVoice,
@@ -64,6 +67,7 @@ export function SettingsScreen({
   const caregiver = state.caregiver.name;
   const safety = today.safety;
   const watching = safety.level !== 'none';
+  const offer = state.watch?.state === 'offered' ? state.watch.offer : undefined;
   const privacyLabel = today.privacyHourUntilLabel;
   const [confirming, setConfirming] = useState(false);
   const keepRef = useRef<SpatialNavigationNodeRef>(null);
@@ -73,6 +77,16 @@ export function SettingsScreen({
   useEffect(() => {
     announce('Settings and privacy. Press Back to return to the home screen.');
   }, []);
+
+  useEffect(() => {
+    if (offer) {
+      announce(
+        `Kinwise has a question. Would you like a ${offer.hours}-hour safety watch for your front door${
+          offer.notifies ? `, and to tell ${offer.notifies} if it looks serious` : ''
+        }? Turn on, or Not now.`,
+      );
+    }
+  }, [offer?.id]);
 
   useEffect(() => {
     if (!watching) setConfirming(false);
@@ -198,8 +212,35 @@ export function SettingsScreen({
               </SpatialNavigationView>
             </Section>
 
-            {/* Always-present node: the safety section comes and goes with the risk window. */}
+            {/* Always-present node: the question and the safety section come and go with her answers. */}
             <SpatialNavigationView direction="vertical">
+              {offer ? (
+                <Section title="Turn on a safety watch?" icon="shield-alert" color={colors.coral} tone="caution">
+                  <Text style={[type.body, styles.sectionText]}>
+                    {`Kinwise noticed warning signs of a scam. Would you like a ${offer.hours}-hour safety watch for your front door` +
+                      (offer.notifies ? `, and to tell ${offer.notifies} if it looks serious?` : '?')}
+                  </Text>
+                  <Text style={[type.small, styles.sectionText]}>
+                    {`Nothing is turned on, and nobody is told, unless you choose Turn on. Kinwise keeps only the kinds of warning sign, never your words, and never says who anyone is.`}
+                  </Text>
+                  <SpatialNavigationView direction="horizontal" style={styles.buttonRow}>
+                    <FocusButton
+                      variant="primary"
+                      label="Turn on"
+                      accessibilityLabel={`Turn on a ${offer.hours} hour safety watch`}
+                      busy={busyKey === 'watch:turn_on'}
+                      onSelect={() => onWatch('turn_on', offer.id)}
+                      style={styles.gap}
+                    />
+                    <FocusButton
+                      label="Not now"
+                      accessibilityHint="Nothing is turned on and nobody is told"
+                      busy={busyKey === 'watch:not_now'}
+                      onSelect={() => onWatch('not_now', offer.id)}
+                    />
+                  </SpatialNavigationView>
+                </Section>
+              ) : null}
               {watching ? (
                 <Section title="Safety watch" icon="shield-alert" color={colors.coral} tone="caution">
                   <Text style={[type.body, styles.sectionText]}>

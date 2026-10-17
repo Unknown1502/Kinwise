@@ -97,9 +97,21 @@ def parse_visit(text: str, now: datetime) -> dict[str, Any] | None:
     return args
 
 
+_WATCH_REVIEW = re.compile(r"\b(review (the )?privacy|what (does|would) (it|that|the watch) (share|send|do)|what('s| is) shared)\b")
+_WATCH_NOT_NOW = re.compile(r"\b(not now|no thanks|no thank you|don\'?t turn (it|that|the (safety )?watch) on|leave it off)\b")
+_WATCH_ON = re.compile(r"\b(turn (it|that|the (safety )?watch) on|turn on the (safety )?watch|yes,? (please )?turn it on|start the (safety )?watch)\b")
+
+
 def classify(persona: str, text: str, now: datetime) -> Intent:
     t = text.lower()
     if persona == "resident":
+        # Her answer to "turn on a six-hour safety watch?" comes first: "review privacy" is not "privacy time".
+        if _WATCH_REVIEW.search(t):
+            return Intent("kinwise_set_safety_watch", {"choice": "review_privacy"})
+        if _WATCH_NOT_NOW.search(t):
+            return Intent("kinwise_set_safety_watch", {"choice": "not_now"})
+        if _WATCH_ON.search(t):
+            return Intent("kinwise_set_safety_watch", {"choice": "turn_on"})
         if re.search(r"\bremind me\b", t):
             body, when = parse_reminder(text, now)
             return Intent("kinwise_add_reminder", {"text": body, "at": when.isoformat()})

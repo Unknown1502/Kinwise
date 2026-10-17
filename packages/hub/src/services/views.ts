@@ -41,6 +41,8 @@ export interface AlertView {
   /** Pause only, resident only: when and how Kinwise first noticed the warning signs. Times and kinds, never words. */
   because?: string;
   pauseMessage?: { from: string; text: string; videoUrl?: string };
+  /** Pause only: did her TV confirm it appeared? The hub knows the event arrived; only the TV can say it was shown. */
+  delivery?: 'sent' | 'shown' | 'not_confirmed';
   resolution?: Alert['resolution'];
   resolvedLabel?: string;
 }
@@ -66,7 +68,7 @@ export interface TimelineView {
   dateLabel: string;
   residentName: string;
   entries: Array<{ at: string; timeLabel: string; kind: TimelineEntry['kind']; text: string }>;
-  summary: { pausesShown: number; unexpectedVisitors: number; expectedVisitors: number; flaggedCalls: number };
+  summary: { pausesSent: number; pausesShown: number; unexpectedVisitors: number; expectedVisitors: number; flaggedCalls: number };
 }
 
 export function signsFor(categories: readonly SignalCategory[]): SignView[] {
@@ -133,7 +135,10 @@ export function originLine(state: HouseholdState, alert: Alert): string | undefi
   return undefined;
 }
 
-export function alertView(state: HouseholdState, alert: Alert, opts: { forResident?: boolean } = {}): AlertView {
+/** A Pause the TV has not confirmed after this long is reported as "not confirmed" (the TV polls every two seconds while it is open). */
+export const PAUSE_CONFIRM_MS = 60_000;
+
+export function alertView(state: HouseholdState, alert: Alert, opts: { forResident?: boolean; now?: Date } = {}): AlertView {
   const tz = state.household.timezone;
   return {
     id: alert.id,
@@ -148,9 +153,16 @@ export function alertView(state: HouseholdState, alert: Alert, opts: { forReside
     caregiverName: primaryCaregiverName(state),
     because: opts.forResident ? originLine(state, alert) : undefined,
     pauseMessage: alert.kind === 'pause' ? state.household.pauseMessage : undefined,
+    delivery: alert.kind === 'pause' && opts.now ? deliveryOf(alert, opts.now) : undefined,
     resolution: alert.resolution,
     resolvedLabel: alert.resolvedAt ? formatClock(new Date(alert.resolvedAt), tz) : undefined,
   };
+}
+
+/** sent: the hub decided and queued it · shown: her TV said it was on screen · not_confirmed: nothing from the TV after a minute. */
+export function deliveryOf(alert: Alert, now: Date): NonNullable<AlertView['delivery']> {
+  if (alert.shownAt) return 'shown';
+  return now.getTime() - Date.parse(alert.createdAt) > PAUSE_CONFIRM_MS ? 'not_confirmed' : 'sent';
 }
 
 const ALERT_PRIORITY: Record<Alert['kind'], number> = { pause: 0, gentle: 1, expected: 2 };
@@ -218,14 +230,15 @@ export function todayView(state: HouseholdState, now: Date, includeReminders: bo
       unread: !m.readAt,
     })),
     safety: safetyView(state, now),
-    activeAlert: alert ? alertView(state, alert, { forResident: includeReminders }) : undefined,
+    activeAlert: alert ? alertView(state, alert, { forResident: includeReminders, now }) : undefined,
     privacyHourUntilLabel: isPrivacyHour(state.privacyHourUntil, now)
       ? formatClock(new Date(state.privacyHourUntil!), tz)
       : undefined,
   };
 }
 
-export function timelineView(state: HouseholdState, day: Date, residentName: string): TimelineView {
+/** `forResident: false` leaves out what only Asha should see: that she said "not now" to a safety watch. */
+export function timelineView(state: HouseholdState, day: Date, residentName: string, forResident = true): TimelineView {
   const tz = state.household.timezone;
   const date = zonedParts(day, tz).date;
   // The timeline is stored newest-first; reverse before the (stable) sort so entries written in the
@@ -233,7 +246,7 @@ export function timelineView(state: HouseholdState, day: Date, residentName: str
   const entries = state.timeline
     .slice()
     .reverse()
-    .filter((e) => zonedParts(new Date(e.at), tz).date === date)
+    .filter((e) => zonedParts(new Date(e.at), tz).date === date && (forResident || e.kind !== 'watch_declined'))
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   const count = (k: TimelineEntry['kind']) => entries.filter((e) => e.kind === k).length;
   return {
@@ -242,6 +255,7 @@ export function timelineView(state: HouseholdState, day: Date, residentName: str
     residentName,
     entries: entries.map((e) => ({ at: e.at, timeLabel: formatClock(new Date(e.at), tz), kind: e.kind, text: e.text })),
     summary: {
+      pausesSent: count('pause_sent'),
       pausesShown: count('pause_shown'),
       unexpectedVisitors: count('visitor_unexpected'),
       expectedVisitors: count('visitor_expected'),

@@ -29,8 +29,8 @@ The four criteria are equally weighted. The scores below are **our own estimates
 
 | Criterion | Our estimate | Evidence | Biggest weakness | A fix that fits the time |
 |---|---|---|---|---|
-| **Tech implementation** | 8 / 10 | A standards-conformant MCP server with MCP Apps cards and two-tier OAuth (16/16, 22/22 checks); deterministic safety engine (194 hub tests, an evaluation with one disclosed miss); Ring Partner API with real WHEP frames and neutral Nova 2 Lite perception; Vega app running on the simulator; AgentCore Runtime + Memory, Strands, Polly, EventBridge Scheduler, SNS, all CDK, live-tested; an independent four-vendor audit whose findings were fixed ([`security-review.md`](security-review.md)) | The Alexa+ surface and the Ring "person" scene are simulated; SMS and WhatsApp are unproven on real phones | Say plainly on screen what is simulated; show the real e-mail arriving |
-| **Design** | 7.5 / 10 | A 10-foot UI with a warm home screen, large Atkinson Hyperlegible text, a calm persimmon Pause that explains *why*, captions, spoken lines, D-pad focus rings, a "nobody answered" state that says so plainly | The video is not made; the Vega footage was captured frame by frame, not with a screen recorder | Record the Vega run with OBS while pressing the same keys |
+| **Tech implementation** | 8 / 10 | A standards-conformant MCP server with MCP Apps cards and two-tier OAuth (16/16, 22/22 checks); deterministic safety engine (220 hub tests, an evaluation of 17 situations with one disclosed miss, and a resident-consent step the backend enforces); Ring Partner API with real WHEP frames and neutral Nova 2 Lite perception; Vega app running on the simulator; AgentCore Runtime + Memory, Strands, Polly, EventBridge Scheduler, SNS, all CDK, live-tested; an independent four-vendor audit whose findings were fixed ([`security-review.md`](security-review.md)) | The Alexa+ surface and the Ring "person" scene are simulated; SMS and WhatsApp are unproven on real phones | Say plainly on screen what is simulated; show the real e-mail arriving |
+| **Design** | 7.5 / 10 | A resident-controlled safety watch (a plain question with Turn on / Not now / Review privacy, on the Echo card and on the TV); a 10-foot UI with a warm home screen, large Atkinson Hyperlegible text, a calm persimmon Pause that explains *why*, captions, spoken lines, D-pad focus rings, a "nobody answered" state that says so plainly | The video is not made; the Vega footage was captured frame by frame, not with a screen recorder | Record the Vega run with OBS while pressing the same keys |
 | **Potential impact** | 7 / 10 | Real, sourced figures ($7.7 B lost by people 60+ in 2025; 63 million caregivers; Alexa Together no longer offered); a product shape (family-set contacts, consent, access log) that could ship as a Fire TV / Ring app | No user research and no pilot; the AWS stack is single-household demo scale | State the limits; do not claim a market study |
 | **Quality of the idea** | 8.5 / 10 | The cross-device join (earlier call → later visitor → TV Pause → family) is the idea; it matches the rules' own "creative, not obvious" examples: Alexa+ "context-aware add-on that maintains state across sessions" and MCP Apps; Ring "caretaking, event-based triggers"; Fire TV "multi-modal UX combining voice + D-pad + visual"; AWS "Bedrock + AgentCore + Strands" | Courier-scam detection by fixed rules is simple by design | Lead the video with the Pause and the *why* line |
 | Friction log bonus | up to +10% | 17 first-hand entries, each with task, steps, expected vs actual, severity, workaround and suggestion | Must be pasted into the form | Blocker 2 |
@@ -59,6 +59,22 @@ The four criteria are equally weighted. The scores below are **our own estimates
 
 Not tested: macOS or Linux hosts, a cold download cache, and the Vega build on a fresh machine.
 
+### 4b. The consent and delivery change (2026-10-16, same day, after the run above)
+
+A flagged call used to open the watch and tell the family automatically (standing consent from onboarding). It now **asks first**, and the TV no longer implies a Pause was seen when it was only sent. Results on the local stack from this working tree (not yet deployed):
+
+| Check | Result |
+|---|---|
+| `npm test`: kit 15, hub 220 (new: 20 consent, 5 sent-vs-shown), infra 12 | all passed |
+| `tv-preview` 100, `echo-sim` 80 (4 skipped without a hub URL) | all passed |
+| `agents/concierge` 43, `agents/ring-worker` 191 | all passed |
+| `npm run typecheck` (hub, kit, infra, echo-sim, tv-preview) | 0 errors; `tv-app` types are checked only by the Vega build in WSL, **not rerun here** |
+| `npm run conformance -w @kinwise/hub`; `alexa-mcp-conformance` | 22 / 22; 16 / 16 (now 11 tools) |
+| `node scripts/demo-scenario.mjs` and `--decline` | Turn on → Pause; Not now → gentle note only |
+| Real Edge, local stack: ask → question → Review privacy (nothing changes) → Turn on → Pause on the TV → TV reports it shown → Call Meera; Not now → gentle note, nobody told; TV closed → "sent", never "shown" | 15 / 15 |
+
+Not done: the **hosted** stack still runs the previous behaviour until it is redeployed (needs your say-so: `cd infra && npx cdk deploy --require-approval never`); the Vega Virtual Device build and the demo video predate this change (blocker 8).
+
 ## 5. Blockers, in order of importance
 
 | # | Blocker | Why it matters | Action |
@@ -70,7 +86,8 @@ Not tested: macOS or Linux hosts, a cold download cache, and the Vega build on a
 | 5 | GitHub **About description and topics** are empty on both repos | First impression of the repo | Set them in the GitHub UI (suggested text in `docs/devpost-draft.md`) |
 | 6 | Real **e-mail and SMS proof on your phone** | The strongest evidence that the family notification is real | Click the AWS confirmation for 9284233564p@gmail.com and send the SMS code; film the inbox |
 | 7 | **Wake word** has not been heard through a real microphone | One claim in the README is only partly verified | Try "Alexa, is this call real?" once in your own Chrome |
+| 8 | **Redeploy and re-record after the consent change** | The hosted demo and the current video still show the old behaviour (the watch starts by itself); a judge would see a mismatch with the README and the new TV chip text | Approve `cdk deploy`; sync `packages/tv-app` into WSL and rebuild the Vega app; re-record the Echo question and the Vega Pause (the video build script is reusable) |
 
 ## 6. Readiness verdict
 
-**NOT READY TO SUBMIT, because two required artifacts do not exist yet** (the demo video and the filled Devpost form). **The product itself is READY WITH DISCLOSED LIMITATIONS.** The code, the hosted demo, the footage and the written answers are done and verified; the limits (simulated Alexa+, no Ring person scene, sandbox-only SMS, unproven wake word) are written in the README and will be said in the video. Closing blockers 1 to 3 moves the verdict to READY WITH DISCLOSED LIMITATIONS.
+**NOT READY TO SUBMIT, because two required artifacts are missing or out of date** (the demo video predates the consent change and is not uploaded; the Devpost form is not filled). **The product itself is READY WITH DISCLOSED LIMITATIONS.** The code, the hosted demo, the footage and the written answers are done and verified; the limits (simulated Alexa+, no Ring person scene, sandbox-only SMS, unproven wake word) are written in the README and will be said in the video. Closing blockers 1 to 3 moves the verdict to READY WITH DISCLOSED LIMITATIONS.

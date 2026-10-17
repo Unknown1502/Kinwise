@@ -45,6 +45,11 @@ function fakeHub(initial: TvStateView, opts: {callDelivered?: boolean} = {}) {
       };
       return json(state.consent);
     }
+    if (path === '/tv/watch') {
+      const turnOn = body.choice === 'turn_on';
+      state = {...state, watch: {state: turnOn ? 'on' : 'declined', ...(turnOn ? {untilLabel: '8:19 PM'} : {})}};
+      return json({message: turnOn ? 'The safety watch is on until 8:19 PM.' : "Okay, I won't turn it on.", watch: state.watch});
+    }
     return json({ok: true});
   };
 
@@ -191,6 +196,48 @@ describe('home screen', () => {
   });
 });
 
+describe('the safety-watch question', () => {
+  const asked = (): TvStateView => ({
+    ...homeState(),
+    today: {...homeState().today, messages: []}, // no unread message, so focus starts on the buttons
+    watch: {state: 'offered', offer: {id: 'offer_1', hours: 6, expiresAt: '2026-10-05T18:49:00.000Z', notifies: 'Meera'}},
+  });
+
+  it('tells her on the home screen that nothing is on yet', async () => {
+    render(<App client={fakeHub(asked()).client} />);
+    await screen.findByTestId('home-screen');
+    expect(screen.getByText('Kinwise has a question')).toBeTruthy();
+    expect(screen.getByText('Open Settings & privacy to answer. Nothing is on yet')).toBeTruthy();
+  });
+
+  it('asks in Settings, says what is and is not shared, and starts nothing by itself', async () => {
+    const hub = fakeHub(asked());
+    render(<App client={hub.client} />);
+    await screen.findByTestId('home-screen');
+    await focusOn('Settings & privacy');
+    press('Enter');
+    await screen.findByTestId('settings-screen');
+    expect(screen.getByText('Turn on a safety watch?')).toBeTruthy();
+    expect(screen.getByText(/6-hour safety watch for your front door, and to tell Meera if it looks serious/)).toBeTruthy();
+    expect(screen.getByText(/Nothing is turned on, and nobody is told, unless you choose Turn on/)).toBeTruthy();
+    expect(actions(hub.posts)).toEqual([]);
+  });
+
+  it('"Turn on" and "Not now" send exactly her choice for that question', async () => {
+    for (const [label, choice] of [['Turn on a 6 hour safety watch', 'turn_on'], ['Not now', 'not_now']] as const) {
+      const hub = fakeHub(asked());
+      render(<App client={hub.client} />);
+      await screen.findByTestId('home-screen');
+      await focusOn('Settings & privacy');
+      press('Enter');
+      await screen.findByTestId('settings-screen');
+      fireEvent.click(screen.getByTestId(`focusable:${label}`));
+      await vi.waitFor(() => expect(actions(hub.posts)).toContainEqual({path: '/tv/watch', body: {choice, offerId: 'offer_1'}}));
+      cleanup();
+    }
+  });
+});
+
 describe('the Pause', () => {
   it('takes over the screen, announces itself and focuses "Call Meera"', async () => {
     const said = collectAnnouncements();
@@ -271,6 +318,24 @@ describe('the Pause', () => {
     await screen.findByTestId('pause-screen');
     press('Escape');
     expect(screen.getByTestId('pause-screen')).toBeTruthy();
+    // The only thing the TV sends on its own is the report that the Pause is on screen; Back closes nothing.
+    expect(actions(hub.posts).filter((p) => !p.path.endsWith('/shown'))).toHaveLength(0);
+  });
+
+  it('tells the hub once that the Pause is on screen (the hub otherwise only knows it was sent)', async () => {
+    const hub = fakeHub(withAlert(homeState(), pauseAlert()));
+    render(<App client={hub.client} />);
+    await screen.findByTestId('pause-screen');
+    await vi.waitFor(() => expect(actions(hub.posts).map((p) => p.path)).toEqual(['/tv/alerts/alert_pause_1/shown']));
+    await new Promise((r) => setTimeout(r, 2500)); // a few polls later it is not repeated
+    expect(actions(hub.posts).filter((p) => p.path.endsWith('/shown'))).toHaveLength(1);
+  });
+
+  it('does not report a Pause the hub already has as shown', async () => {
+    const hub = fakeHub(withAlert(homeState(), pauseAlert({delivery: 'shown'})));
+    render(<App client={hub.client} />);
+    await screen.findByTestId('pause-screen');
+    await new Promise((r) => setTimeout(r, 300));
     expect(actions(hub.posts)).toHaveLength(0);
   });
 });

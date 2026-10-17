@@ -20,6 +20,15 @@ describe('scenario evaluation: Kinwise vs a door-only rule', () => {
       'courier-after-window-expired': 'Note',
       'privacy-time': 'Quiet',
       'nobody-visible': 'Quiet',
+      // consent, revocation and failure paths
+      'watch-declined': 'Note',
+      'watch-unanswered': 'Note',
+      'watch-ended': 'Note',
+      'screening-revoked': 'Note',
+      'door-revoked': 'Quiet',
+      'call-no-visitor': 'Quiet',
+      'duplicate-event': 'Pause',
+      'late-event': 'Quiet',
     });
   });
 
@@ -37,7 +46,16 @@ describe('scenario evaluation: Kinwise vs a door-only rule', () => {
 
   it('tells the family only when it matters (high risk), not for every stranger', async () => {
     const { rows } = await runScenarios();
-    expect(rows.filter((r) => r.kinwiseFamilyPinged).map((r) => r.id)).toEqual(['scam-call-then-courier']);
+    expect(rows.filter((r) => r.kinwiseFamilyPinged).map((r) => r.id)).toEqual(['scam-call-then-courier', 'duplicate-event']);
+  });
+
+  it('never pings the family for a watch Asha declined, ended or never answered, and pings once for a duplicate event', async () => {
+    const { rows } = await runScenarios();
+    const pinged = (id: string) => rows.find((r) => r.id === id)!.kinwiseFamilyPinged;
+    for (const id of ['watch-declined', 'watch-unanswered', 'watch-ended', 'screening-revoked', 'door-revoked', 'call-no-visitor', 'late-event']) {
+      expect(pinged(id), id).toBe(false);
+    }
+    expect(pinged('duplicate-event')).toBe(true); // once: the second delivery is dropped (service.test "is idempotent on visitor event ids")
   });
 
   it('keeps the published table in docs/evaluation.md in sync with the code', async () => {

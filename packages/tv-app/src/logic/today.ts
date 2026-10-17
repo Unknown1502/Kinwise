@@ -110,8 +110,8 @@ export interface StatusNote {
 }
 
 /** The status in the corner of the home screen, as a title and one line of detail. */
-export function statusNote(state: Pick<TvStateView, 'today' | 'consent' | 'call'>, privacyMinutesLeft?: number): StatusNote {
-  const {today, consent, call} = state;
+export function statusNote(state: Pick<TvStateView, 'today' | 'consent' | 'call' | 'watch'>, privacyMinutesLeft?: number): StatusNote {
+  const {today, consent, call, watch} = state;
   // A family member who has not answered outranks everything else on the chip.
   if (call?.status === 'unanswered') {
     return {tone: 'caution', title: `${call.caregiverName} still hasn't answered`, detail: `Please call ${call.caregiverName} yourself`};
@@ -120,7 +120,7 @@ export function statusNote(state: Pick<TvStateView, 'today' | 'consent' | 'call'
     return {tone: 'caution', title: `${call.caregiverName} hasn't answered yet`, detail: 'We sent a second message. You can call too'};
   }
   if (call?.status === 'asked') {
-    return {tone: 'ok', title: `${call.caregiverName} has been told`, detail: 'An answer will appear here'};
+    return {tone: 'ok', title: `Message sent to ${call.caregiverName}`, detail: 'Not read yet. An answer will appear here'};
   }
   if (today.privacyHourUntilLabel) {
     const until = today.privacyHourUntilLabel;
@@ -132,6 +132,9 @@ export function statusNote(state: Pick<TvStateView, 'today' | 'consent' | 'call'
           ? `${durationLabel(privacyMinutesLeft)} left, until ${until}`
           : `Until ${until}`,
     };
+  }
+  if (watch?.state === 'offered') {
+    return {tone: 'caution', title: 'Kinwise has a question', detail: 'Open Settings & privacy to answer. Nothing is on yet'};
   }
   if (today.safety && today.safety.level !== 'none') {
     return {

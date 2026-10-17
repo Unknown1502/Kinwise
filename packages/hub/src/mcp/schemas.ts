@@ -29,9 +29,23 @@ export const alertView = z.object({
   signs: z.array(sign),
   caregiverName: z.string(),
   because: z.string().optional(),
+  delivery: z.enum(['sent', 'shown', 'not_confirmed']).optional(),
   pauseMessage: z.object({ from: z.string(), text: z.string(), videoUrl: z.string().optional() }).optional(),
   resolution: z.enum(['call_family', 'known_person', 'dismiss']).optional(),
   resolvedLabel: z.string().optional(),
+});
+
+export const watchView = z.object({
+  state: z.enum(['none', 'offered', 'on', 'declined']),
+  untilLabel: z.string().optional(),
+  offer: z.object({ id: z.string(), hours: z.number(), expiresAt: z.string(), notifies: z.string().optional() }).optional(),
+});
+
+export const watchResult = z.object({
+  watch: watchView,
+  riskWindow: safety,
+  message: z.string(),
+  privacy: z.array(z.string()).optional(),
 });
 
 export const screeningView = z.object({
@@ -41,6 +55,7 @@ export const screeningView = z.object({
   advice: z.array(z.string()),
   followUp: z.string().optional(),
   riskWindow: safety,
+  watch: watchView,
   caregiverName: z.string(),
   reminder: z.object({ id: z.string(), text: z.string(), timeLabel: z.string() }).optional(),
 });
@@ -68,6 +83,7 @@ export const timelineView = z.object({
   residentName: z.string(),
   entries: z.array(z.object({ at: z.string(), timeLabel: z.string(), kind: z.string(), text: z.string() })),
   summary: z.object({
+    pausesSent: z.number(),
     pausesShown: z.number(),
     unexpectedVisitors: z.number(),
     expectedVisitors: z.number(),

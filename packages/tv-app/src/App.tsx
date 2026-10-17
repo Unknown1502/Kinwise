@@ -21,7 +21,7 @@ import {OnboardingScreen, type ConsentDraft} from './screens/OnboardingScreen';
 import {PauseScreen} from './screens/PauseScreen';
 import {SettingsScreen} from './screens/SettingsScreen';
 import {colors} from './theme/theme';
-import type {AlertAction, AlertView, ConsentKey, ProposalDecision, TvStateView} from './types';
+import type {AlertAction, AlertView, ConsentKey, ProposalDecision, TvStateView, WatchChoice} from './types';
 import {useVoice} from './voice/useVoice';
 
 type Route = 'home' | 'settings';
@@ -138,6 +138,20 @@ export function App({client: injected}: AppProps = {}) {
   }, [state, voice]);
   const alert = selection?.alert;
   const showPause = !calling && selection?.screen === 'pause';
+  // The hub knows the event arrived and the Pause was decided; only this TV knows it drew it. Report that once per Pause,
+  // and try again on the next state change if the network failed (the ref is set only after the hub accepted it).
+  const reportedPause = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const id = showPause ? alert?.id : undefined;
+    if (!id || alert?.kind !== 'pause' || alert.delivery === 'shown' || reportedPause.current === id) return;
+    client.pauseShown(id).then(
+      () => {
+        reportedPause.current = id;
+      },
+      () => undefined,
+    );
+  }, [client, showPause, alert?.id, alert?.kind, alert?.delivery]);
+
   const gentle = !calling && !showPause && selection?.overlay === 'gentle' ? alert : undefined;
   const expected = !calling && !showPause && selection?.overlay === 'expected' ? alert : undefined;
   const baseActive = !gentle;
@@ -231,6 +245,15 @@ export function App({client: injected}: AppProps = {}) {
     [client, run, say],
   );
 
+  const answerWatch = useCallback(
+    (choice: WatchChoice, offerId?: string) =>
+      run(`watch:${choice}`, async () => {
+        const r = await client.answerWatch(choice, offerId);
+        say(r.message);
+      }),
+    [client, run, say],
+  );
+
   const closeSafety = useCallback(
     () =>
       run('safety', async () => {
@@ -313,6 +336,7 @@ export function App({client: injected}: AppProps = {}) {
         onPrivacy={(m) => void togglePrivacy(m)}
         onDecide={(id, d) => void decide(id, d)}
         onCloseSafety={() => void closeSafety()}
+        onWatch={(choice, offerId) => void answerWatch(choice, offerId)}
         onBack={() => setRoute('home')}
         voiceOn={voiceOn}
         onVoice={setVoiceOn}

@@ -24,3 +24,33 @@ The door decision is deterministic and explainable: `packages/hub/src/domain/dec
 - These are **scripted situations and unit tests**, not a field study. They prove the rules do what they claim. They do not estimate how often real scams happen or how often real doorbells misfire.
 - The evaluation compares Kinwise with a door-only rule built from Kinwise's own parts. It is a design comparison, not a benchmark against a named product.
 - The 6-hour warning window and the 5-minute freshness limit are judgement calls, written as named constants (`RISK_WINDOW_HOURS`, `EVENT_MAX_AGE_MS`) so a reviewer can see and change them.
+
+## The 17 situations, end to end (added 2026-10-16 with the consent step)
+
+Every row names a test that fails if it breaks. "Scenario row" means a line in [`docs/evaluation.md`](evaluation.md), run by `npm run scenarios -w @kinwise/hub`. Tests are in `packages/hub/test/` unless a path says otherwise.
+
+| # | Situation | Trigger → backend decision | What Asha sees | What the family gets | Privacy invariant | Evidence |
+|---|---|---|---|---|---|---|
+| 1 | Watch authorised, then an unexpected visitor | flagged call → question → **Turn on** → visitor → `pause` | The Pause, with why | One safety signal, sent when she turned it on | Only category labels stored | `watch-consent` S1.2; `service` "runs reminder → check → …"; scenario row 1 |
+| 2 | Ordinary expected delivery or visitor | visitor on the expected list → `expected` | A calm greeting | Nothing | — | `domain` "treats an expected visitor calmly even inside a high window"; scenario rows 6, 7 |
+| 3 | Expected visitor during an active watch | same, inside a high window → `expected` | Greeting, never a Pause | Nothing | — | same tests |
+| 4 | Suspicious call, no visitor | watch on, no door event | Nothing on the TV; the watch lapses | One signal at Turn on | — | `service` "a suspicious call with no visitor afterwards…"; scenario row "call-no-visitor" |
+| 5 | Unexpected visitor, no scam signal | visitor, no window → `gentle` | A gentle note | Nothing | — | `domain` "shows a gentle card with no window"; scenario rows 4, 5 |
+| 6 | Expired safety signal | visitor after the 6-hour window → `gentle` | A gentle note (the one reported miss) | Nothing | — | `domain` "forgets signals older than 24 hours"; scenario row 3 |
+| 7 | Resident refusal | **Not now** → no window, signals dropped, no re-ask for an hour | Advice only; later a gentle note | **Nothing** | Nothing stored as a signal | `watch-consent` S2.1, S2.2, S2.3; browser check "Not now…"; scenario rows "watch-declined", "watch-unanswered" |
+| 8 | Revocation before a visitor | she ends the watch, switches screening off, or switches door awareness off | Gentle note or nothing | Nothing new | A pending question and its signs are withdrawn | `watch-consent` S6.3, S7.1; scenario rows "watch-ended", "screening-revoked", "door-revoked" |
+| 9 | Privacy time | privacy hour → `ignored` | Nothing | Nothing | Only a counter | `service` "stores nothing during a privacy hour…"; scenario row 8 |
+| 10 | Duplicate Ring event | same `eventId` twice → second is `ignored` | One Pause | One signal | — | `service` "is idempotent on visitor event ids"; scenario row "duplicate-event" |
+| 11 | Delayed event (older than 5 minutes) | `stale_event` → `ignored` | Nothing | Nothing | — | `domain` "a door event must be fresh"; `service` "a doorbell event that arrives hours late is ignored"; scenario row "late-event" |
+| 12 | Invalid, future-dated or forged event | bad signature → 401; more than 2 minutes in the future → `ignored` | Nothing | Nothing | — | `http` "rejects a bad signature"; `domain` "allows a minute or two of clock difference, but not an event from the future" |
+| 13 | Family notification failure | channel fails | The TV says "We couldn't reach Meera" | — | — | `callback` "says NOT delivered when the real channel failed"; `tv-preview/test/render.test.tsx` |
+| 14 | TV state unavailable or delayed | the TV never reports the Pause | The hub says **sent**, then **not confirmed** after 60 s; never "shown" | The message says Kinwise cannot tell whether she saw it | — | `pause-delivery` S1.1, S2.1, S3.1; browser check "With no TV app open the Pause is 'sent'" |
+| 15 | Unauthorised caregiver | a caregiver or service identity tries to answer, read or change | Refused | — | The request is refused and logged | `watch-consent` S4.1, S9.1; `service` "enforces roles"; `contacts` |
+| 16 | Resident dismisses the Pause | `dismiss` → resolved | Closed | Nobody called | — | `callback` "does not claim a call for the other answers" |
+| 17 | Recovery after a network interruption | the TV or worker loses the hub, then it returns | "Reconnecting…", last state kept, then caught up | — | — | `tv-preview/test/poller.test.ts` ("backs off … and recovers"); ring worker "hub outage is retried on the next poll" |
+
+### Honest reading of this table
+
+- Unit and integration tests prove the rules do what this page says. The scenario suite is 17 scripted situations on one synthetic household; it does not measure how often real scams or real doorbells behave this way, and it says nothing about real-world effectiveness.
+- **Asking first costs coverage.** In rows 7 and 8 Kinwise deliberately catches nothing, because Asha did not (or no longer does) consent. That is the design, not a bug; how often real residents would say "Not now" is unknown.
+- "Shown" means the TV app reported it rendered the Pause. It does not mean Asha looked at it, and Kinwise cannot observe whether it is the foreground app.

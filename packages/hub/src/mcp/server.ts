@@ -16,6 +16,7 @@ import {
   todayView,
   tvReadResult,
   visitResult,
+  watchResult,
 } from './schemas.js';
 import { UI_HTML } from './ui-bundle.generated.js';
 
@@ -42,10 +43,18 @@ const INSTRUCTIONS = `Kinwise is a consent-first family safety add-on for an old
 - When the resident describes a phone call, letter, text or visitor request involving money, a bank, a government agency, gold, gift cards, crypto or a courier, call kinwise_check_call with what was said, in their words. Then read the advice calmly.
 - Route every "remind me…" request from the resident to kinwise_add_reminder. If it returns a followUp, say it.
 - When the resident asks to hear or see their messages or their day "on the TV", call kinwise_read_on_tv; the living-room TV reads it aloud.
+- A flagged call or reminder only OFFERS a safety watch (watch.offer). Ask the resident the question in your own calm words and wait. Only after she answers, call kinwise_set_safety_watch with her choice. Never turn it on for her, never ask twice after "not now", and never choose on a caregiver's behalf.
 - Never pressure, shame or alarm. Kinwise advises; it never controls. The resident can always dismiss.
 - Family members (caregivers) see signals only: never transcripts, recordings or reminder text.`;
 
 type Card = keyof typeof UI_URIS;
+
+/** The plain-words question Alexa asks. Nothing is turned on, and nobody is told, until she answers "turn on". */
+function watchQuestion(w: { offer?: { hours: number; notifies?: string } }): string {
+  if (!w.offer) return '';
+  const tell = w.offer.notifies ? `, and tell ${w.offer.notifies} if it looks serious` : '';
+  return ` Would you like me to turn on a ${w.offer.hours}-hour safety watch for your front door${tell}? You can say turn it on, not now, or review privacy. I won't do it unless you say so.`;
+}
 
 function ok(text: string, structured: unknown): CallToolResult {
   return { content: [{ type: 'text', text }], structuredContent: structured as Record<string, unknown> };
@@ -132,7 +141,7 @@ export function buildMcpServer(identity: Identity, service: KinwiseService): Mcp
       guard(async ({ text, at }) => {
         const v = await service.addReminder(identity, { text, at });
         const said = `Okay, I'll remind you at ${v.reminder?.timeLabel}: ${v.reminder?.text}.`;
-        return ok(v.followUp ? `${said} ${v.followUp}` : said, v);
+        return ok(v.followUp ? `${said} ${v.followUp}${watchQuestion(v.watch)}` : said, v);
       }),
     );
 
@@ -142,7 +151,7 @@ export function buildMcpServer(identity: Identity, service: KinwiseService): Mcp
       {
         title: 'Second opinion on a call',
         description:
-          "Give the resident a calm second opinion on a phone call, letter, text or visitor request. Pass what the caller said, in the resident's words. Kinwise checks six courier-scam warning signs, combines them with earlier signals today, and may watch the front door more closely for a few hours. The words themselves are never stored.",
+          "Give the resident a calm second opinion on a phone call, letter, text or visitor request. Pass what the caller said, in the resident's words. Kinwise checks six courier-scam warning signs and combines them with earlier signals today. If it finds some, it only OFFERS a six-hour safety watch of the front door (watch.offer); it starts nothing until the resident says yes. The words themselves are never stored.",
         inputSchema: z.object({
           description: z.string().min(1).max(2000).describe('What the caller said or asked for'),
         }),
@@ -153,13 +162,35 @@ export function buildMcpServer(identity: Identity, service: KinwiseService): Mcp
       guard(async ({ description }) => {
         const v = await service.checkCall(identity, { description });
         const signs = v.signs.map((s) => s.label.toLowerCase()).join(', ');
+        const ask = watchQuestion(v.watch);
         const text =
           v.level === 'high'
-            ? `This has the warning signs of a scam: ${signs}. Real banks and agencies never send couriers to collect money. Please don't hand anything over. Would you like me to call ${v.caregiverName}?`
+            ? `This has the warning signs of a scam: ${signs}. Real banks and agencies never send couriers to collect money. Please don't hand anything over.${ask}`
             : v.level === 'elevated'
-              ? `Some of this sounds like a scam (${signs}). Let's check with ${v.caregiverName} before doing anything.`
+              ? `Some of this sounds like a scam (${signs}). Let's check with ${v.caregiverName} before doing anything.${ask}`
               : "I don't see common scam warning signs. If anything feels off, it's okay to hang up and call back on a number you trust.";
         return ok(text, v);
+      }),
+    );
+
+    registerAppTool(
+      server,
+      'kinwise_set_safety_watch',
+      {
+        title: 'Safety watch: turn on, not now, or review privacy',
+        description:
+          "Record the resident's answer to the safety-watch question that kinwise_check_call or kinwise_add_reminder asked (watch.offer.id). Call it only after the resident has said so in her own words: 'turn_on' starts a six-hour watch of the front door (and lets Kinwise tell family if it looks serious), 'not_now' declines it, 'review_privacy' explains exactly what it shares and changes nothing. Never choose for her.",
+        inputSchema: z.object({
+          offerId: z.string().optional().describe('The id of the open question (watch.offer.id); leave out for the one open question'),
+          choice: z.enum(['turn_on', 'not_now', 'review_privacy']),
+        }),
+        outputSchema: watchResult,
+        annotations: { title: 'Safety watch', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        _meta: ui('screening', ['model', 'app']),
+      },
+      guard(async ({ offerId, choice }) => {
+        const r = await service.respondToWatch(identity, offerId, choice);
+        return ok(r.privacy ? `${r.message} ${r.privacy.join(' ')}` : r.message, r);
       }),
     );
 
@@ -277,7 +308,7 @@ export function buildMcpServer(identity: Identity, service: KinwiseService): Mcp
       const text =
         v.entries.length === 0
           ? `A quiet day so far for ${v.residentName}.`
-          : `${v.residentName}'s day: ${s.expectedVisitors} expected visitors, ${s.unexpectedVisitors} unexpected, ${s.pausesShown} Pause${s.pausesShown === 1 ? '' : 's'} shown. Latest: ${v.entries.at(-1)?.text}`;
+          : `${v.residentName}'s day: ${s.expectedVisitors} expected visitors, ${s.unexpectedVisitors} unexpected, ${s.pausesSent} Pause${s.pausesSent === 1 ? '' : 's'} sent (${s.pausesShown} confirmed on the TV). Latest: ${v.entries.at(-1)?.text}`;
       return ok(text, v);
     }),
   );

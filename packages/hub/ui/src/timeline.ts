@@ -4,7 +4,7 @@ interface TimelineData {
   dateLabel: string;
   residentName: string;
   entries: Array<{ timeLabel: string; kind: string; text: string }>;
-  summary: { pausesShown: number; unexpectedVisitors: number; expectedVisitors: number; flaggedCalls: number };
+  summary: { pausesSent: number; pausesShown: number; unexpectedVisitors: number; expectedVisitors: number; flaggedCalls: number };
 }
 
 const stat = (n: number, label: string) => el('div', { class: 'stat' }, el('b', {}, String(n)), label);
@@ -21,7 +21,8 @@ mountCard('timeline', (d: TimelineData) => {
       { class: 'summary' },
       stat(d.summary.expectedVisitors, 'expected visitors'),
       stat(d.summary.unexpectedVisitors, 'unexpected'),
-      stat(d.summary.pausesShown, 'Pauses shown'),
+      stat(d.summary.pausesSent, 'Pauses sent'),
+      stat(d.summary.pausesShown, 'confirmed on the TV'),
       stat(d.summary.flaggedCalls, 'calls checked'),
     ),
   );

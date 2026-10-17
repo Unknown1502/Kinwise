@@ -146,6 +146,8 @@ export interface Alert {
   riskLevel?: Exclude<RiskLevel, 'none'>;
   categories?: SignalCategory[];
   visitLabel?: string;
+  /** When her TV told the hub the Pause was on screen. Absent = sent, not confirmed shown. */
+  shownAt?: string;
   resolution?: AlertAction;
   resolvedAt?: string;
   resolvedBy?: string;
@@ -170,8 +172,11 @@ export type TimelineKind =
   | 'call_checked'
   | 'window_opened'
   | 'window_closed'
+  | 'watch_on'
+  | 'watch_declined'
   | 'visitor_expected'
   | 'visitor_unexpected'
+  | 'pause_sent'
   | 'pause_shown'
   | 'alert_resolved'
   | 'privacy_hour'
@@ -216,6 +221,19 @@ export interface StoredNotice {
   callId?: string;
 }
 
+/**
+ * A question put to the resident after a call or reminder matched scam warning signs: "turn on a six-hour
+ * safety watch and send Meera a signal?". It holds only the kinds of sign, never her words, and nothing
+ * is watched, stored as a signal or sent to the family until she answers "turn on".
+ */
+export interface WatchOffer {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  /** The warning signs that prompted the question: kinds and times only, never the words. Not yet in `signals`. */
+  signals: SignalRecord[];
+}
+
 export interface HouseholdState {
   version: number;
   household: Household;
@@ -225,6 +243,12 @@ export interface HouseholdState {
   expectedVisits: ExpectedVisit[];
   signals: SignalRecord[];
   riskWindow?: RiskWindow;
+  /** The open question, if any (spec §5.4). Cleared on any answer, on expiry and when screening is switched off. */
+  watchOffer?: WatchOffer;
+  /** After "Not now" Kinwise does not ask again until this time. */
+  watchDeclinedUntil?: string;
+  /** The last answer, so a repeated tap or a retried request does the same thing once. */
+  lastWatchAnswer?: { offerId: string; choice: 'turn_on' | 'not_now'; at: string };
   visitorEvents: VisitorEvent[];
   alerts: Alert[];
   messages: FamilyMessage[];

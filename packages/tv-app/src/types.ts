@@ -50,6 +50,8 @@ export interface AlertView {
   caregiverName: string;
   /** Pause only: where the warning came from ("At 10:20 AM you asked Kinwise about a call..."). */
   because?: string;
+  /** Pause only: sent (the hub decided) · shown (this TV said it was on screen) · not_confirmed. */
+  delivery?: 'sent' | 'shown' | 'not_confirmed';
   pauseMessage?: PauseMessage;
   resolution?: AlertAction;
   resolvedLabel?: string;
@@ -95,6 +97,15 @@ export interface AccessLogEntry {
   action: string;
 }
 
+/** Whether the safety watch is on, being offered (waiting for her answer), or turned down. Mirrors the hub's WatchView. */
+export interface WatchView {
+  state: 'none' | 'offered' | 'on' | 'declined';
+  untilLabel?: string;
+  offer?: {id: string; hours: number; expiresAt: string; notifies?: string};
+}
+
+export type WatchChoice = 'turn_on' | 'not_now' | 'review_privacy';
+
 export interface TvStateView {
   household: {id: string; name: string; timezone: string};
   resident: {id: string; name: string};
@@ -103,6 +114,8 @@ export interface TvStateView {
   activeAlert?: AlertView;
   pendingProposals: PendingProposal[];
   consent: Consent;
+  /** Absent when talking to a hub from before the safety-watch question. */
+  watch?: WatchView;
   privacyHourUntil?: string;
   accessLog: AccessLogEntry[];
   /** Something Alexa asked this TV to read aloud (present for two minutes; play each id once). */

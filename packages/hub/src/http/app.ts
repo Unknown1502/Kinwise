@@ -7,7 +7,7 @@ import type { TokenVerifier } from '../auth/verify.js';
 import type { HubConfig } from '../config.js';
 import type { AlertAction, Recurrence, VisitorEvent } from '../domain/types.js';
 import { buildMcpServer, SERVER_VERSION } from '../mcp/server.js';
-import { KinwiseService, NotFoundError, ValidationError } from '../services/kinwise.js';
+import { KinwiseService, NotFoundError, ValidationError, type WatchChoice } from '../services/kinwise.js';
 import { ackKey, verifyAck } from '../services/ackLink.js';
 import { signSpeech, speechKey, speechText, verifySpeech, type SpeechSynth } from '../speech/speech.js';
 import type { OutboxNotifier } from '../services/notifier.js';
@@ -146,6 +146,11 @@ export function createApp(deps: AppDeps): Hono<Env> {
     await service.acknowledgeAlert(c.get('identity'), c.req.param('id'));
     return c.json({ ok: true });
   });
+  // Her TV reports that the Pause is on screen: the only thing that turns "sent" into "shown".
+  tv.post('/alerts/:id/shown', async (c) => {
+    await service.markAlertShown(c.get('identity'), c.req.param('id'));
+    return c.json({ ok: true });
+  });
   // "I know this person" → remember them: the resident adds an expected visit from the TV.
   tv.post('/visits', async (c) => {
     const body = await c.req.json<{ label?: string; recurrence?: Recurrence }>();
@@ -165,6 +170,12 @@ export function createApp(deps: AppDeps): Hono<Env> {
   tv.post('/messages/:id/read', async (c) => {
     await service.markMessageRead(c.get('identity'), c.req.param('id'));
     return c.json({ ok: true });
+  });
+  // Her answer to "turn on a safety watch?": the TV is a second place she can say yes or not now.
+  tv.post('/watch', async (c) => {
+    const { offerId, choice } = await c.req.json<{ offerId?: string; choice?: WatchChoice }>();
+    if (!choice) throw new ValidationError('choice is required');
+    return c.json(await service.respondToWatch(c.get('identity'), offerId, choice));
   });
   tv.post('/safety/close', async (c) => c.json(await service.closeRiskWindow(c.get('identity'))));
   app.route('/tv', tv);

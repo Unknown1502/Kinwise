@@ -10,6 +10,8 @@
 
 Courier scams need two steps: a scary call, then someone at the door. Kinwise connects them. When a stranger rings after a warning sign, Asha's TV pauses her gently, says why, and one press calls her daughter.
 
+**Kinwise connects an earlier scam warning with a later doorstep event, giving a resident an explainable, consent-controlled opportunity to pause and ask for help.**
+
 ## Inspiration
 
 Courier scams have two steps: a caller posing as a bank or the FTC frightens an older adult, then a "courier" comes to the home for cash or gold. No single device sees both steps. People aged 60 and over reported $7.7 billion in fraud losses in 2025 (about 60% more than 2024, [AARP on the FBI's 2025 data](https://www.aarp.org/money/scams-fraud/fbi-ftc-report-2025-losses/)). In the FBI Boston cases of 2023 to May 2025, roughly 98% of the $26 million lost was reported by people over 60 ([FBI Boston](https://www.fbi.gov/contact-us/field-offices/boston/news/fbi-boston-warns-of-increase-in-gold-bar-and-bulk-cash-courier-scams)). Sixty-three million Americans give care to someone ([AARP 2025](https://www.aarp.org/press/releases/2025-07-24-new-report-reveals-crisis-point-for-americas-63-million-family-caregivers.html)), and Amazon's own Alexa Together page says that service is no longer offered.
@@ -17,8 +19,8 @@ Courier scams have two steps: a caller posing as a bank or the FTC frightens an 
 ## What it does
 
 1. Asha tells Alexa about a reminder or asks "is this call real?". Kinwise matches documented scam warning signs with fixed, explainable rules and keeps **only the category labels**, never the words.
-2. It watches the door more closely for six hours, and tells her daughter Meera that there is a warning (a signal, not content).
-3. A stranger rings the Ring doorbell. Asha's **Fire TV shows the Pause and speaks it**: "someone is at your door, and no visit is expected right now. At 10:20 AM you asked Kinwise about a call, and it matched courier-scam warning signs." Meera's recorded message appears with captions, and **Call Meera** is focused on the remote.
+2. Kinwise **asks**: "Would you like a 6-hour safety watch for your front door, and to tell Meera if it looks serious?" with **Turn on**, **Not now** and **Review privacy**. Nothing is watched, stored as a signal or sent until she says Turn on (by voice or on her TV), and a "Not now" is not repeated for an hour. If she turns it on, Kinwise watches the door more closely for six hours and tells her daughter Meera there is a warning (a signal, not content).
+3. A stranger rings the Ring doorbell. Because she turned the watch on, Asha's **Fire TV shows the Pause and speaks it** (without it she would see only a gentle note): "someone is at your door, and no visit is expected right now. At 10:20 AM you asked Kinwise about a call, and it matched courier-scam warning signs." Meera's recorded message appears with captions, and **Call Meera** is focused on the remote.
 4. Asha presses it. **Meera is told for real**: an e-mail (and SMS or WhatsApp if she set them up) with an **I'm calling now** link. One button puts "I got your request and I'm calling you now" on Asha's TV, read aloud. If nobody answers, a second message goes out after about 2 minutes and the TV says so plainly. If no real channel could be reached, the TV says "We couldn't reach Meera" instead of promising a call.
 5. Meera's own Alexa shows a timeline of **signals, never recordings**. Asha can read, in Settings, every time family looked at her information, and turn anything off.
 
@@ -28,12 +30,13 @@ Courier scams have two steps: a caller posing as a bank or the FTC frightens an 
 - **Ring**: the official **Ring Partner API** and Developer Playground (devices, history, WHEP live view, signed webhooks). Frames stay in memory; Nova 2 Lite describes presence neutrally, never identity.
 - **Fire TV**: a **React Native for Vega OS** app (D-pad first, VoiceView, captions, an accessible typeface), run on the **Vega Virtual Device** and in a browser preview from the same source.
 - **AWS** (all CDK): Lambda (ARM64) + API Gateway, Cognito, DynamoDB, Secrets Manager, SNS, EventBridge Scheduler, Polly (the TV's voice), X-Ray, **Bedrock AgentCore Runtime + Memory**, **Strands Agents** and **Amazon Nova 2 Lite**.
-- **The model never makes a safety decision.** The warning signs, the warning window and the door decision are deterministic rules with named constants and 194 hub tests; the model only talks kindly and describes a camera scene neutrally.
+- **The model never makes a safety decision.** The warning signs, the warning window and the door decision are deterministic rules with named constants and 220 hub tests; the model only talks kindly and describes a camera scene neutrally.
 - **Open source**: `alexa-plus-mcp-kit` (Apache-2.0), a library and `alexa-mcp-conformance` CLI that checks any MCP server against the Alexa+ add-on contract.
 
 ## Challenges
 
 - The Ring Developer Playground has no "person at the door" scene and no way to choose one, so the real feed correctly shows an empty doorstep and Kinwise stays quiet; the Pause in the demo is shown from our labelled doorbell simulator through the same rules.
+- A third-party Fire TV app cannot draw over other apps, so the Pause only appears while Kinwise is the active app, and Kinwise has no supported way to know that. It records a Pause as **sent** when the hub decides and **shown** only when the TV app reports it drew the screen, and the family message says it cannot tell whether she saw it.
 - "Delivered" does not mean "read". We had to build the follow-up, an honest failure screen and a one-tap confirmation so the TV never promises help that is not coming.
 - A four-vendor audit of our notification code found real flaws (shared-address unsubscribes, late-confirmed subscriptions, an unsigned follow-up event, one wrong IAM grant). We fixed them and wrote down what we accepted and rejected ([`docs/security-review.md`](security-review.md)).
 - The Vega SDK is Linux and macOS only; we built and ran it in Ubuntu on WSL2 and documented the path (friction log #12 and #14).
@@ -41,7 +44,7 @@ Courier scams have two steps: a caller posing as a bank or the FTC frightens an 
 ## Accomplishments
 
 - A cross-device story that works end to end on a hosted AWS stack, with every simulated part labelled.
-- A measured comparison with a door-only rule ([`docs/evaluation.md`](evaluation.md)): 0 false urgent alerts on harmless visitors, **and one miss that we report** (a courier arriving after the 6-hour window).
+- A measured comparison with a door-only rule ([`docs/evaluation.md`](evaluation.md)): 0 false urgent alerts on harmless visitors, **and one miss that we report** (a courier arriving after the 6-hour window). The same suite shows the cost of asking first: when Asha says "Not now" Kinwise deliberately does nothing. These are scripted situations, not a field study.
 - The real Ring API, the real Vega device, a real e-mail and a real follow-up schedule, each run and recorded.
 
 ## What we learned

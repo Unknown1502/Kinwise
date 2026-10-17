@@ -22,11 +22,17 @@ const REMINDER = 'Courier from the bank picking up a package';
 /** Thursday 2026-10-08 (the gardener's day) in New York, UTC-4; override `date` for the aide's Tuesday. */
 const DAY = '2026-10-08';
 
+/** What Asha answers when asked "turn on a six-hour safety watch?" (default: turn on). `none` leaves the question unanswered. */
+type Answer = 'turn_on' | 'not_now' | 'none';
+
 type Step =
-  | { at: string; do: 'check' }
-  | { at: string; do: 'reminder' }
+  | { at: string; do: 'check'; answer?: Answer }
+  | { at: string; do: 'reminder'; answer?: Answer }
   | { at: string; do: 'privacy'; minutes: number }
-  | { at: string; do: 'visitor'; present?: boolean };
+  | { at: string; do: 'end_watch' }
+  | { at: string; do: 'consent'; set: { scamScreening?: boolean; doorAwareness?: boolean; caregiverAlerts?: boolean } }
+  /** `old`: the event describes a visit that many minutes ago (a retried webhook). `twice`: the same event id arrives again. */
+  | { at: string; do: 'visitor'; present?: boolean; old?: number; twice?: boolean };
 
 export type Truth = 'scam' | 'benign' | 'by-design';
 
@@ -57,6 +63,23 @@ export const SCENARIOS: Scenario[] = [
     steps: [{ at: '10:20', do: 'check' }, { at: '12:00', do: 'privacy', minutes: 120 }, { at: '12:30', do: 'visitor' }] },
   { id: 'nobody-visible', title: 'Scam call checked at 10:20, the doorbell sees motion but no person at 2:41 PM', truth: 'by-design',
     steps: [{ at: '10:20', do: 'check' }, { at: '14:41', do: 'visitor', present: false }] },
+  // Consent, revocation and failure paths (truth "by design": they are the resident's choices or protections, not detections).
+  { id: 'watch-declined', title: 'Scam call checked at 10:20, Asha answers "Not now" to the safety watch, a courier rings at 2:41 PM', truth: 'by-design',
+    steps: [{ at: '10:20', do: 'check', answer: 'not_now' }, { at: '14:41', do: 'visitor' }] },
+  { id: 'watch-unanswered', title: 'Scam call checked at 10:20, the safety-watch question is never answered, a courier rings at 2:41 PM', truth: 'by-design',
+    steps: [{ at: '10:20', do: 'check', answer: 'none' }, { at: '14:41', do: 'visitor' }] },
+  { id: 'watch-ended', title: 'Scam call checked at 10:20, watch on, Asha ends it at 12:00, a courier rings at 2:41 PM', truth: 'by-design',
+    steps: [{ at: '10:20', do: 'check' }, { at: '12:00', do: 'end_watch' }, { at: '14:41', do: 'visitor' }] },
+  { id: 'screening-revoked', title: 'Asha switches scam screening off at 9:00, checks a call at 10:20, a courier rings at 2:41 PM', truth: 'by-design',
+    steps: [{ at: '09:00', do: 'consent', set: { scamScreening: false } }, { at: '10:20', do: 'check' }, { at: '14:41', do: 'visitor' }] },
+  { id: 'door-revoked', title: 'Watch on at 10:20, Asha switches door awareness off at 12:00, someone rings at 2:41 PM', truth: 'by-design',
+    steps: [{ at: '10:20', do: 'check' }, { at: '12:00', do: 'consent', set: { doorAwareness: false } }, { at: '14:41', do: 'visitor' }] },
+  { id: 'call-no-visitor', title: 'Scam call checked at 10:20, watch on, nobody comes to the door all day', truth: 'by-design',
+    steps: [{ at: '10:20', do: 'check' }] },
+  { id: 'duplicate-event', title: 'Watch on at 10:20, the same courier event reaches the hub twice at 2:41 PM', truth: 'by-design',
+    steps: [{ at: '10:20', do: 'check' }, { at: '14:41', do: 'visitor', twice: true }] },
+  { id: 'late-event', title: 'Watch on at 10:20, a retried event from 2:41 PM only reaches the hub at 3:30 PM', truth: 'by-design',
+    steps: [{ at: '10:20', do: 'check' }, { at: '15:30', do: 'visitor', old: 49 }] },
 ];
 
 export type KinwiseOutcome = 'Pause' | 'Note' | 'Greeting' | 'Quiet';
@@ -112,16 +135,22 @@ async function run(scenario: Scenario): Promise<Row> {
   let n = 0;
   for (const step of scenario.steps) {
     clock.t = at(step.at);
-    if (step.do === 'check') await service.checkCall(asha, { description: CALL });
-    else if (step.do === 'reminder') await service.addReminder(asha, { text: REMINDER, at: at('14:00').toISOString() });
-    else if (step.do === 'privacy') await service.setPrivacyHour(asha, step.minutes);
+    if (step.do === 'check' || step.do === 'reminder') {
+      const v = step.do === 'check'
+        ? await service.checkCall(asha, { description: CALL })
+        : await service.addReminder(asha, { text: REMINDER, at: at('14:00').toISOString() });
+      const answer = step.answer ?? 'turn_on';
+      if (v.watch.offer && answer !== 'none') await service.respondToWatch(asha, v.watch.offer.id, answer);
+    } else if (step.do === 'privacy') await service.setPrivacyHour(asha, step.minutes);
+    else if (step.do === 'end_watch') await service.closeRiskWindow(asha, 'Resident ended the safety watch');
+    else if (step.do === 'consent') await service.updateConsent(asha, step.set);
     else {
       const present = step.present ?? true;
       const before = notifier.outbox.length;
       const event: VisitorEvent = {
         eventId: `${scenario.id}-${++n}`,
         deviceId: 'front-door',
-        occurredAt: clock.t.toISOString(),
+        occurredAt: new Date(clock.t.getTime() - (step.old ?? 0) * 60_000).toISOString(),
         source: 'demo',
         ringEventType: 'button_press',
         perception: {
@@ -131,7 +160,8 @@ async function run(scenario: Scenario): Promise<Row> {
         },
       };
       decision = (await service.ingestVisitor(HH, event)).decision;
-      pinged = notifier.outbox.length > before;
+      if (step.twice) await service.ingestVisitor(HH, event);
+      pinged = notifier.outbox.length - before > 0;
     }
   }
   return {
@@ -153,7 +183,7 @@ function score(rows: Row[], urgent: (r: Row) => boolean, pings: (r: Row) => bool
     scamsTotal: scams.length,
     falseUrgent: benign.filter(urgent).length,
     benignTotal: benign.length,
-    familyPings: rows.filter(pings).length,
+    familyPings: rows.filter((r) => r.truth !== 'by-design' && pings(r)).length,
   };
 }
 
@@ -214,7 +244,8 @@ ${line('Door-only, calm for every stranger', summary.doorOnlyCalm)}
 
 - Knowing about the call is what lets Kinwise be **urgent when it matters and calm when it does not**. A door-only rule must pick one: it either cries wolf at every delivery and neighbour, or it never raises the alarm.
 - **Kinwise misses one scam**, reported as a failure: a courier who arrives after the 6-hour risk window has closed (\`RISK_WINDOW_HOURS\` in \`packages/hub/src/domain/risk.ts\`). A longer window would catch it at the cost of more Pauses. That trade-off belongs to Asha and her family, so it is left as it is.
-- Privacy time and "nobody visible" are choices, not detections, so they are not scored.
+- The rows marked "by design" are the resident's choices and the system's protections (privacy time, "Not now", ending or revoking the watch, no visitor, a duplicate or late event), not detections, so they are shown but not scored. "Family pinged" counts only the scored rows.
+- **Asking first has a cost, and it is the point.** A scam call Asha will not turn a watch on for ("Not now", or the question goes unanswered) is not followed by a Pause: a courier at 2:41 PM gets only a gentle note. Kinwise will not watch or tell her family without her say-so, so in those rows it deliberately catches nothing. How often real residents answer "Not now" is unknown and would need a field study.
 - These are scripted situations, not a field study. They prove the rules do what they claim; they do not estimate how often scams really happen.
 - The Pause also tells Asha *why*: "At 10:20 AM you asked Kinwise about a call, and it matched courier-scam warning signs." It is built from the time and kind of each earlier warning, never from the words said, and the family never see it for a reminder (reminders are Asha's own).
 `;

@@ -7,6 +7,8 @@ import type {
   RespondResult,
   SafetyView,
   TvStateView,
+  WatchChoice,
+  WatchView,
 } from './types';
 
 /** Typed client for the Kinwise hub's Fire TV API (spec §6.2). Bearer device token, 8 s timeouts. */
@@ -63,6 +65,11 @@ export class HubClient {
     return this.request<RespondResult>('POST', `/tv/alerts/${encodeURIComponent(alertId)}/respond`, {action});
   }
 
+  /** Tell the hub the Pause is on screen. Only this TV can say so; until it does, the hub reports the Pause as sent, not shown. */
+  pauseShown(alertId: string): Promise<{ok: boolean}> {
+    return this.request<{ok: boolean}>('POST', `/tv/alerts/${encodeURIComponent(alertId)}/shown`, {});
+  }
+
   /** Quietly clear an expected-visitor notice on the hub after the toast was shown. */
   acknowledgeAlert(alertId: string): Promise<{ok: boolean}> {
     return this.request<{ok: boolean}>('POST', `/tv/alerts/${encodeURIComponent(alertId)}/seen`, {});
@@ -83,6 +90,11 @@ export class HubClient {
 
   markMessageRead(messageId: string): Promise<{ok: boolean}> {
     return this.request<{ok: boolean}>('POST', `/tv/messages/${encodeURIComponent(messageId)}/read`, {});
+  }
+
+  /** Her answer to "turn on a six-hour safety watch?". Nothing starts, and nobody is told, until she picks turn_on. */
+  answerWatch(choice: WatchChoice, offerId?: string): Promise<{message: string; watch: WatchView}> {
+    return this.request<{message: string; watch: WatchView}>('POST', '/tv/watch', {choice, offerId});
   }
 
   /** Resident ends the safety watch (risk window) early. */

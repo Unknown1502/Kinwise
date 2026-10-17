@@ -52,11 +52,34 @@ def test_reminder_without_time_defaults_to_one_hour():
         ("caregiver", "Why did Kinwise alert?", "kinwise_explain_last_alert"),
         ("caregiver", "Send Mom a message: Dinner Sunday? ❤️", "kinwise_send_family_message"),
         ("caregiver", "Add Maria the nurse on Tuesday from 2 to 3 PM as an expected visitor", "kinwise_add_expected_visit"),
+        ("resident", "Yes, turn it on", "kinwise_set_safety_watch"),
+        ("resident", "Please turn the safety watch on", "kinwise_set_safety_watch"),
+        ("resident", "Not now", "kinwise_set_safety_watch"),
+        ("resident", "No thanks, don't turn it on", "kinwise_set_safety_watch"),
+        ("resident", "Review privacy", "kinwise_set_safety_watch"),
         ("resident", "tell me a joke", None),
     ],
 )
 def test_intents(persona, text, tool):
     assert classify(persona, text, NOW).tool == tool
+
+
+@pytest.mark.parametrize(
+    ("text", "choice"),
+    [("Yes, turn it on", "turn_on"), ("Not now", "not_now"), ("No thanks, don't turn it on", "not_now"), ("Review privacy", "review_privacy")],
+)
+def test_the_safety_watch_answer_is_only_what_she_said(text, choice):
+    intent = classify("resident", text, NOW)
+    assert intent.args == {"choice": choice}
+
+
+def test_review_privacy_is_not_privacy_time():
+    assert classify("resident", "give me an hour of privacy", NOW).tool == "kinwise_set_privacy_hour"
+    assert classify("resident", "review privacy", NOW).tool == "kinwise_set_safety_watch"
+
+
+def test_a_caregiver_cannot_answer_for_her():
+    assert classify("caregiver", "Yes, turn it on", NOW).tool is None
 
 
 def test_tv_topics():

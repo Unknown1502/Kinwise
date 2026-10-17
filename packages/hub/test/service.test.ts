@@ -24,6 +24,9 @@ function setup(start = local('10:00')) {
   return { clock, store, notifier, service };
 }
 
+/** Asha's explicit answer to "turn on a safety watch?" after a flagged call or reminder. */
+const turnOn = (service: KinwiseService, v: { watch: { offer?: { id: string } } }) => service.respondToWatch(asha, v.watch.offer!.id, 'turn_on');
+
 const visitor = (id: string, hhmm: string, personPresent = true): VisitorEvent => ({
   eventId: id,
   deviceId: 'front-door',
@@ -48,7 +51,8 @@ describe('KinwiseService — hero story', () => {
     const r = await service.addReminder(asha, { text: 'Courier from the bank picking up a package', at: local('14:00').toISOString() });
     expect(r.level).toBe('elevated');
     expect(r.followUp).toMatch(/Is this call real/);
-    expect(r.riskWindow.level).toBe('elevated');
+    expect(r.riskWindow.level).toBe('none'); // she is asked first; nothing is watched yet
+    expect(r.watch.state).toBe('offered');
 
     // 10:20 she asks Kinwise about the call
     clock.t = local('10:20');
@@ -58,6 +62,8 @@ describe('KinwiseService — hero story', () => {
     expect(v.level).toBe('high');
     expect(v.signs.map((s) => s.key)).toEqual(['authority', 'urgency', 'secrecy', 'unusual_payment', 'courier_pickup']);
     expect(v.advice[0]).toMatch(/Don't hand anything/);
+    expect(notifier.outbox).toEqual([]);
+    await service.respondToWatch(asha, v.watch.offer!.id, 'turn_on'); // her explicit choice
     expect(notifier.outbox.map((x) => x.kind)).toEqual(['risk_high']);
 
     // 14:41 an unexpected visitor
@@ -67,6 +73,8 @@ describe('KinwiseService — hero story', () => {
 
     const state = await service.tvState(tv);
     expect(state.activeAlert?.kind).toBe('pause');
+    expect(state.activeAlert?.delivery).toBe('sent'); // decided, not yet confirmed on screen
+    await service.markAlertShown(tv, ingest.alertId!); // the TV reports that it drew the Pause
     expect(state.activeAlert?.pauseMessage?.from).toBe('Meera');
     expect(state.activeAlert?.signs.length).toBe(5);
     expect(notifier.outbox[0]?.kind).toBe('pause');
@@ -80,12 +88,13 @@ describe('KinwiseService — hero story', () => {
     // Meera's timeline shows signals, never content
     const tl = await service.getTimeline(priya);
     const text = tl.entries.map((e) => e.text).join('\n');
-    expect(tl.summary).toMatchObject({ pausesShown: 1, unexpectedVisitors: 1, flaggedCalls: 1 });
+    expect(tl.summary).toMatchObject({ pausesSent: 1, pausesShown: 1, unexpectedVisitors: 1, flaggedCalls: 1 });
     expect(text).not.toMatch(/FTC|gold|accounts are compromised/i);
     expect(text).toMatch(/chose "Call Meera"/);
-    // Same-instant entries keep causal order: the visitor arrives, then the Pause is shown.
+    // Same-instant entries keep causal order: the visitor arrives, the Pause is sent, then the TV says it was shown.
     const kinds = tl.entries.map((e) => e.kind);
-    expect(kinds.indexOf('visitor_unexpected')).toBeLessThan(kinds.indexOf('pause_shown'));
+    expect(kinds.indexOf('visitor_unexpected')).toBeLessThan(kinds.indexOf('pause_sent'));
+    expect(kinds.indexOf('pause_sent')).toBeLessThan(kinds.indexOf('pause_shown'));
     expect(kinds.at(-1)).toBe('alert_resolved');
   });
 
@@ -187,7 +196,7 @@ describe('KinwiseService — hero story', () => {
 
   it('explains the last alert in one sentence', async () => {
     const { service, clock } = ctx;
-    await service.checkCall(asha, { description: 'the bank fraud department says a courier will collect the gold' });
+    await turnOn(service, await service.checkCall(asha, { description: 'the bank fraud department says a courier will collect the gold' }));
     clock.t = local('12:00');
     const { alertId } = await service.ingestVisitor(HH, visitor('q', '12:00'));
     await service.respondToAlert(asha, alertId!, 'known_person');
@@ -239,7 +248,7 @@ describe('KinwiseService: the cases around the hero story', () => {
   it('a suspicious call with no visitor afterwards: the family hears once, nothing pops up, and the watch lapses by itself', async () => {
     const { service, clock, notifier } = ctx;
     clock.t = local('10:20');
-    await service.checkCall(asha, { description: CALL });
+    await turnOn(service, await service.checkCall(asha, { description: CALL }));
     expect(notifier.outbox.map((n) => n.kind)).toEqual(['risk_high']); // once, a signal only
     expect((await service.tvState(tv)).activeAlert).toBeUndefined(); // no Pause without a visitor
     expect((await service.tvState(tv)).today.safety.level).toBe('high');
@@ -253,7 +262,7 @@ describe('KinwiseService: the cases around the hero story', () => {
   it('a doorbell event that arrives hours late is ignored, with no alert and no message to the family', async () => {
     const { service, clock, notifier } = ctx;
     clock.t = local('10:20');
-    await service.checkCall(asha, { description: CALL });
+    await turnOn(service, await service.checkCall(asha, { description: CALL }));
     const before = notifier.outbox.length;
     clock.t = local('14:50'); // the visitor rang at 14:41 but the event only reaches the hub now
     const late = await service.ingestVisitor(HH, { ...visitor('late-1', '14:41'), occurredAt: local('11:00').toISOString() });

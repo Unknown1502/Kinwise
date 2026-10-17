@@ -34,6 +34,9 @@ const visitor = (id: string, hhmm: string): VisitorEvent => ({
   perception: { personPresent: true, peopleCount: 1, carrying: 'a small box', description: 'A person at the front door holding a small box' },
 });
 
+/** Asha's explicit answer to "turn on a safety watch?" (the hub never starts one by itself). */
+const turnOn = (service: KinwiseService, v: { watch: { offer?: { id: string } } }) => service.respondToWatch(asha, v.watch.offer!.id, 'turn_on');
+
 const CALL = 'A man from the FTC said my accounts are compromised and I should withdraw it as gold. Do not tell my family.';
 
 describe('the Pause says where its warning came from', () => {
@@ -46,7 +49,7 @@ describe('the Pause says where its warning came from', () => {
   it('S1.1: names the call she asked about', async () => {
     const { service, clock } = ctx;
     clock.t = local('10:20');
-    await service.checkCall(asha, { description: CALL });
+    await turnOn(service, await service.checkCall(asha, { description: CALL }));
     clock.t = local('12:00');
     await service.ingestVisitor(HH, visitor('v1', '12:00'));
 
@@ -60,7 +63,7 @@ describe('the Pause says where its warning came from', () => {
     clock.t = local('10:15');
     await service.addReminder(asha, { text: 'Courier from the bank picking up a package', at: local('14:00').toISOString() });
     clock.t = local('10:20');
-    await service.checkCall(asha, { description: CALL });
+    await turnOn(service, await service.checkCall(asha, { description: CALL }));
     clock.t = local('12:00');
     await service.ingestVisitor(HH, visitor('v2', '12:00'));
 
@@ -74,7 +77,7 @@ describe('the Pause says where its warning came from', () => {
     const { service, clock } = ctx;
     clock.t = local('10:20');
     await service.addReminder(asha, { text: 'Courier from the bank picking up a package', at: local('14:00').toISOString() });
-    await service.checkCall(asha, { description: CALL });
+    await turnOn(service, await service.checkCall(asha, { description: CALL }));
     clock.t = local('12:00');
     await service.ingestVisitor(HH, visitor('v6', '12:00'));
     expect((await service.tvState(tv)).activeAlert!.because).toBe(
@@ -85,7 +88,7 @@ describe('the Pause says where its warning came from', () => {
   it('S2.1: never repeats the words that were said', async () => {
     const { service, clock } = ctx;
     clock.t = local('10:20');
-    await service.checkCall(asha, { description: CALL });
+    await turnOn(service, await service.checkCall(asha, { description: CALL }));
     await service.addReminder(asha, { text: 'Gold courier from the FTC at two', at: local('14:00').toISOString() });
     clock.t = local('12:00');
     await service.ingestVisitor(HH, visitor('v3', '12:00'));
@@ -106,7 +109,7 @@ describe('the Pause says where its warning came from', () => {
   it('S3.1: family members never see it (reminders are the resident\'s)', async () => {
     const { service, clock } = ctx;
     clock.t = local('10:15');
-    await service.addReminder(asha, { text: 'Courier from the bank picking up a package', at: local('14:00').toISOString() });
+    await turnOn(service, await service.addReminder(asha, { text: 'Courier from the bank picking up a package', at: local('14:00').toISOString() }));
     clock.t = local('12:00');
     await service.ingestVisitor(HH, visitor('v5', '12:00'));
 
@@ -125,7 +128,7 @@ describe('MCP tools still match their output schema with the origin line', () =>
       clock: { now: () => fixed },
     });
     const now = fixed.getTime();
-    await service.checkCall(asha, { description: CALL });
+    await turnOn(service, await service.checkCall(asha, { description: CALL }));
     await service.ingestVisitor(HH, { ...visitor('mcp1', '12:00'), occurredAt: new Date(now).toISOString() });
 
     const connect = async (token: string) => {

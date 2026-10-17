@@ -66,11 +66,14 @@ Matching normalizes case, punctuation and common spelling variants. The rule lis
 
 Categories from every screened text (reminders and "is this legit?" checks) are kept as **category labels and timestamps only, never the text**. A rolling 24-hour window is unioned, then levelled with the same rule. This is what lets "remind me: courier from the bank at 2 p.m." plus a later "is this call legit?" add up to `high` even when each on its own is only `elevated`.
 
-### 5.4 Risk window
+### 5.4 Risk window (the safety watch) and the resident's choice
 
-- Opens when the accumulated level is `elevated` or `high`. The default duration is **6 hours** (`RISK_WINDOW_HOURS`).
+- **Nothing starts by itself.** A call or reminder that matches warning signs only **offers** a watch (`watchOffer`, 30 minutes to answer, holding category labels and times, never words). Asha chooses: **Turn on** (the watch opens, and family is told if it looks serious), **Not now** (nothing is stored as a signal, nothing is sent, and Kinwise does not ask again for an hour), or **Review privacy** (a plain list of what the watch shares; changes nothing). She can answer by voice (Alexa) or on the TV. A caregiver, or the discovery-only service identity, cannot answer for her.
+- Opens when she turns it on and the accumulated level is `elevated` or `high`. The default duration is **6 hours** (`RISK_WINDOW_HOURS`). While a watch she turned on is running, a new warning extends or upgrades it without another question.
 - Upgrades from elevated to high when new signals arrive. Expiry extends to `max(current, now + 6h)`.
 - Only Asha (resident scope) can close it early. The reason is logged.
+- Turning **scam screening** off withdraws a pending question and its signs; turning **door awareness** off or using **privacy time** stops the Pause (spec §5.6, rule 1).
+- The timeline records `watch_on` and, for Asha only, `watch_declined`, as facts without content.
 
 ### 5.5 Expected visits
 
@@ -100,6 +103,12 @@ Asha resolves an alert from the TV or the Echo:
 
 An unresolved Pause auto-expires after 30 minutes.
 
+### 5.8 A Pause that was sent is not a Pause that was shown
+
+The hub knows an event arrived and that it decided to Pause. Only the TV knows it drew the screen. So the hub records `pause_sent` when it decides, and `pause_shown` only when the TV app reports it (`POST /tv/alerts/:id/shown`). `delivery` on a Pause is `sent`, `shown`, or `not_confirmed` (nothing from the TV after 60 s). The family message says Kinwise *sent* a Pause and cannot tell whether she saw it; the timeline and `explain_last_alert` say the same. "Shown" means the app rendered the Pause, not that she looked at it.
+
+**Foreground limit.** A third-party Fire TV app cannot draw over another app, so the Pause appears only while Kinwise is the active app. Kinwise does not try to detect "foreground" (there is no supported way); it observes only what it can: the TV's poll, the TV's `shown` report, and "Reconnecting…" when the hub is unreachable. If the TV does not report within a minute the Pause stays `not_confirmed` and the family is told a call may help. An e-mail alone never protects Asha in real time and is never described as doing so.
+
 ## 6. Interfaces
 
 ### 6.1 MCP server (`POST /mcp`, protocol 2025-11-25, Streamable HTTP, stateless)
@@ -109,7 +118,8 @@ Tools are scoped by role, taken from the token's `role` claim. Every tool return
 | Tool | Role | Annotations | UI |
 |---|---|---|---|
 | `kinwise_add_reminder {text, at}` | resident | write, not destructive | `ui://kinwise/screening` |
-| `kinwise_check_call {description}` | resident | write (may open a window), not destructive | `ui://kinwise/screening` |
+| `kinwise_check_call {description}` | resident | write (stores category labels, may offer a watch), not destructive | `ui://kinwise/screening` |
+| `kinwise_set_safety_watch {offerId?, choice}` | resident | write; `turn_on` · `not_now` · `review_privacy`; visible to model and app | `ui://kinwise/screening` |
 | `kinwise_get_today {}` | resident, caregiver | read-only | `ui://kinwise/today` |
 | `kinwise_add_expected_visit {label, weekday?, date?, start, end}` | resident (active), caregiver (proposed) | write | — |
 | `kinwise_respond_to_alert {alertId, action}` | resident | write; visible to model and app | `ui://kinwise/pause` |
@@ -128,8 +138,10 @@ Auth follows the Alexa+ two-tier model:
 
 ### 6.2 Fire TV API (bearer device token)
 
-- `GET /tv/state` → `{household, resident, caregiver, today, activeAlert, pendingProposals, consent, privacyHourUntil, accessLog, serverTime}`. Here `today` carries the date and time labels, `reminders`, `visits`, `messages` and `safety` (the risk window level and "until" label).
+- `GET /tv/state` → `{household, resident, caregiver, today, activeAlert, pendingProposals, consent, watch, privacyHourUntil, accessLog, serverTime}`. Here `today` carries the date and time labels, `reminders`, `visits`, `messages` and `safety` (the risk window level and "until" label).
 - `POST /tv/alerts/:id/respond {action: call_family|known_person|dismiss}`
+- `POST /tv/watch {choice, offerId?}`: her answer to the safety-watch question on the TV
+- `POST /tv/alerts/:id/shown`: the TV says the Pause is on screen (until then it is only "sent")
 - `POST /tv/alerts/:id/seen` quietly clears an *expected-visitor* notice (no timeline entry)
 - `POST /tv/visits {label, recurrence}`: the resident remembers a visitor ("I know this person")
 - `POST /tv/proposals/:id {decision: approve|decline}`
@@ -146,8 +158,8 @@ Auth follows the Alexa+ two-tier model:
 
 ## 7. Privacy rules (enforced in code, shown in the UI)
 
-1. **The resident owns the switch.** Consent and the privacy hour are set only on Asha's TV, or by her own voice.
-2. **Signals, not streams.** The caregiver sees events ("unexpected visitor 2:41 p.m., Pause shown, Mom chose Call Meera"). They never see transcripts, frames or video.
+1. **The resident owns the switch.** Consent, the privacy hour and each safety watch are set only on Asha's TV, or by her own voice. Kinwise asks before it watches or tells family, and a refusal is respected.
+2. **Signals, not streams.** The caregiver sees events ("unexpected visitor 2:41 p.m., Pause sent to the TV, Mom chose Call Meera"). They never see transcripts, frames or video.
 3. **No stored check text.** "Is this legit?" stores categories and level only. Reminders keep their text, because the reminder is the point.
 4. **No faces, no plates, no identity.** Perception returns presence, count, carried objects and a neutral description. Frames are discarded after perception.
 5. **Advise, never control.** Kinwise never locks doors or calls police. Every card can be dismissed with one press.
