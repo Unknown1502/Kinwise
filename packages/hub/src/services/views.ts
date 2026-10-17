@@ -138,7 +138,7 @@ export function originLine(state: HouseholdState, alert: Alert): string | undefi
 /** A Pause the TV has not confirmed after this long is reported as "not confirmed" (the TV polls every two seconds while it is open). */
 export const PAUSE_CONFIRM_MS = 60_000;
 
-export function alertView(state: HouseholdState, alert: Alert, opts: { forResident?: boolean; now?: Date } = {}): AlertView {
+export function alertView(state: HouseholdState, alert: Alert, opts: { forResident?: boolean; now: Date }): AlertView {
   const tz = state.household.timezone;
   return {
     id: alert.id,
@@ -153,7 +153,7 @@ export function alertView(state: HouseholdState, alert: Alert, opts: { forReside
     caregiverName: primaryCaregiverName(state),
     because: opts.forResident ? originLine(state, alert) : undefined,
     pauseMessage: alert.kind === 'pause' ? state.household.pauseMessage : undefined,
-    delivery: alert.kind === 'pause' && opts.now ? deliveryOf(alert, opts.now) : undefined,
+    delivery: alert.kind === 'pause' ? deliveryOf(alert, opts.now) : undefined,
     resolution: alert.resolution,
     resolvedLabel: alert.resolvedAt ? formatClock(new Date(alert.resolvedAt), tz) : undefined,
   };
@@ -237,8 +237,8 @@ export function todayView(state: HouseholdState, now: Date, includeReminders: bo
   };
 }
 
-/** `forResident: false` leaves out what only Asha should see: that she said "not now" to a safety watch. */
-export function timelineView(state: HouseholdState, day: Date, residentName: string, forResident = true): TimelineView {
+/** `forResident: false` leaves out what only Asha should see: that she said "not now" to a safety watch. Required, so a new caller cannot show it to family by forgetting. */
+export function timelineView(state: HouseholdState, day: Date, residentName: string, forResident: boolean): TimelineView {
   const tz = state.household.timezone;
   const date = zonedParts(day, tz).date;
   // The timeline is stored newest-first; reverse before the (stable) sort so entries written in the

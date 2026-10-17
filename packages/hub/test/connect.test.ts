@@ -35,7 +35,7 @@ const visitor = (id: string, hhmm: string): VisitorEvent => ({
 });
 
 /** Asha's explicit answer to "turn on a safety watch?" (the hub never starts one by itself). */
-const turnOn = (service: KinwiseService, v: { watch: { offer?: { id: string } } }) => service.respondToWatch(asha, v.watch.offer!.id, 'turn_on');
+const turnOn = (service: KinwiseService, v: { watch: { offer?: { id: string } } }) => service.respondToWatch(tv, v.watch.offer!.id, 'turn_on');
 
 const CALL = 'A man from the FTC said my accounts are compromised and I should withdraw it as gold. Do not tell my family.';
 

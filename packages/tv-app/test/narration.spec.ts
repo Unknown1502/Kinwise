@@ -1,5 +1,6 @@
 /* What the TV says aloud (jest on the Vega build machine, vitest in packages/tv-preview). */
 import {alertLine, callFailedLine, callingLine, narration} from '../src/logic/narration';
+import type {TvStateView} from '../src/types';
 import {SIGNS, expectedAlert, gentleAlert, homeState, pauseAlert, withAlert} from './fixtures';
 
 describe('narration', () => {
@@ -67,5 +68,14 @@ describe('narration', () => {
     expect(alertLine(expectedAlert(), 'Asha')).toBe("Luis (gardener) is at the door. They're on today's list.");
     expect(callingLine('Meera')).toBe("I've told Meera to call you. You don't need to open the door.");
     expect(callFailedLine('Meera')).toBe("I couldn't reach Meera. Please call Meera yourself. You don't need to open the door.");
+  });
+
+  it('says the safety-watch question once when it appears, and says nothing starts without her', () => {
+    const before = homeState();
+    const offered: TvStateView = {...before, watch: {state: 'offered', offer: {id: 'offer_1', hours: 6, expiresAt: '2026-10-05T18:49:00.000Z', notifies: 'Meera'}}};
+    const lines = narration(before, offered);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/Kinwise has a question.*6-hour safety watch.*tell Meera if it looks serious.*Nothing starts unless you choose Turn on/);
+    expect(narration(offered, offered)).toEqual([]); // not again on the next poll
   });
 });

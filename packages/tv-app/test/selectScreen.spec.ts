@@ -3,6 +3,7 @@
  * `npm test` here) and under vitest (packages/tv-preview includes this folder).
  */
 import {selectScreen, visibleAlert} from '../src/logic/selectScreen';
+import type {TvStateView} from '../src/types';
 import {expectedAlert, gentleAlert, homeState, notOnboarded, pauseAlert, withAlert} from './fixtures';
 
 describe('selectScreen', () => {
@@ -101,5 +102,33 @@ describe('visibleAlert', () => {
 
   it('returns the active alert', () => {
     expect(visibleAlert(withAlert(homeState(), gentleAlert()))?.id).toBe('alert_gentle_1');
+  });
+
+  describe('the safety-watch question', () => {
+    const offered = (): TvStateView => ({
+      ...homeState(),
+      watch: {state: 'offered', offer: {id: 'offer_1', hours: 6, expiresAt: '2026-10-05T18:49:00.000Z', notifies: 'Meera'}},
+    });
+
+    it('is a sheet over Home', () => {
+      expect(selectScreen(offered())).toEqual({screen: 'home', overlay: 'watch'});
+    });
+
+    it('is not shown again once she pressed Back on it', () => {
+      expect(selectScreen(offered(), {hiddenWatchOfferId: 'offer_1'})).toEqual({screen: 'home', overlay: null});
+      expect(selectScreen(offered(), {hiddenWatchOfferId: 'offer_0'})).toEqual({screen: 'home', overlay: 'watch'});
+    });
+
+    it('waits behind onboarding, a Pause and a visitor panel', () => {
+      expect(selectScreen(notOnboarded(offered())).overlay).toBeNull();
+      expect(selectScreen(withAlert(offered(), pauseAlert())).screen).toBe('pause');
+      expect(selectScreen(withAlert(offered(), gentleAlert())).overlay).toBe('gentle');
+    });
+
+    it('is absent when nothing was offered, was declined, or is already on', () => {
+      expect(selectScreen(homeState()).overlay).toBeNull();
+      expect(selectScreen({...homeState(), watch: {state: 'declined'}}).overlay).toBeNull();
+      expect(selectScreen({...homeState(), watch: {state: 'on', untilLabel: '8:19 PM'}}).overlay).toBeNull();
+    });
   });
 });

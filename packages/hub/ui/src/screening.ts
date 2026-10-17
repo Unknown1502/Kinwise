@@ -3,7 +3,7 @@ import { LEVEL_TEXT, brand, callAndRender, el, mountCard, signsList, type CardCo
 interface WatchData {
   state: 'none' | 'offered' | 'on' | 'declined';
   untilLabel?: string;
-  offer?: { id: string; hours: number; notifies?: string };
+  offer?: { id: string; hours: number; notifies?: string; tellsNow?: boolean };
 }
 
 interface ScreeningData {
@@ -24,12 +24,10 @@ interface ScreeningData {
 /** "Would you like a six-hour safety watch?": three plain choices, nothing happens until she picks one. */
 function watchQuestion(d: ScreeningData, ctx: CardContext): HTMLElement {
   const offer = d.watch!.offer!;
-  const tell = offer.notifies ? ` and tell ${offer.notifies} if it looks serious` : '';
-  const turnOn = el('button', { class: 'primary' }, 'Turn on') as HTMLButtonElement;
+  const tell = offer.notifies ? (offer.tellsNow ? ` and send ${offer.notifies} a short message right away` : ` and tell ${offer.notifies} if it looks serious`) : '';
   const notNow = el('button', {}, 'Not now') as HTMLButtonElement;
   const review = el('button', {}, 'Review privacy') as HTMLButtonElement;
   const answer = (b: HTMLButtonElement, choice: string) => () => callAndRender(ctx, b, 'kinwise_set_safety_watch', { offerId: offer.id, choice });
-  turnOn.addEventListener('click', answer(turnOn, 'turn_on'));
   notNow.addEventListener('click', answer(notNow, 'not_now'));
   review.addEventListener('click', answer(review, 'review_privacy'));
   const box = el(
@@ -38,9 +36,10 @@ function watchQuestion(d: ScreeningData, ctx: CardContext): HTMLElement {
     el('h2', {}, 'Turn on a safety watch?'),
     el('p', { class: 'big' }, `Would you like a ${offer.hours}-hour safety watch for your front door${tell}?`),
     el('p', {}, "Nothing is turned on, and nobody is told, unless you choose Turn on."),
-    el('div', { class: 'actions' }, turnOn, notNow, review),
+    el('p', { class: 'note' }, "To turn it on, press Turn on on your TV. Kinwise can't tell from here that it's you speaking, so it only starts a watch, or tells family, from your authenticated TV."),
+    el('div', { class: 'actions' }, notNow, review),
   );
-  queueMicrotask(() => turnOn.focus());
+  queueMicrotask(() => review.focus());
   return box;
 }
 

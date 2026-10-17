@@ -3,7 +3,8 @@
 Run: node scripts/dev.mjs --offline   (another terminal), then:  pip install playwright && python scripts/golden-path-check.py
 Uses Microsoft Edge (channel "msedge"); change `channel` to "chrome" or drop it for bundled Chromium.
 
-Authorize path: ask -> question -> "Turn on" -> doorbell -> Pause on the TV -> TV reports it shown -> Call Meera.
+Authorize path: ask -> question -> a spoken "turn it on" does NOT start it -> Turn on on the TV -> doorbell -> Pause on the TV
+                -> TV reports it shown -> Call Meera.
 Refuse path:    ask -> question -> "Not now" -> doorbell -> only a gentle note, nobody told.
 Review path:    "Review privacy" explains and changes nothing.
 Failure path:   TV page closed -> the Pause is "sent", never "shown".
@@ -74,8 +75,10 @@ async def main():
         check(st["watch"]["state"] == "offered" and st["today"]["safety"]["level"] == "none",
               "A flagged call only OFFERS a watch: the TV state shows a question and no watch", f"watch={st['watch']['state']} safety={st['today']['safety']['level']}")
         check(not notices(), "Nobody in the family was told before she answered")
-        buttons = [await card(echo).get_by_role("button", name=n).count() for n in ("Turn on", "Not now", "Review privacy")]
-        check(all(buttons), "The Echo card shows Turn on / Not now / Review privacy", str(buttons))
+        buttons = {n: await card(echo).get_by_role("button", name=n).count() for n in ("Turn on", "Not now", "Review privacy")}
+        check(buttons == {"Turn on": 0, "Not now": 1, "Review privacy": 1}, "The Echo card offers Not now and Review privacy, and no Turn on (it cannot verify who is speaking)", str(buttons))
+        card_text = await card(echo).locator("body").inner_text()
+        check("press Turn on on your TV" in card_text, "The Echo card says where to confirm")
         await echo.screenshot(path=os.path.join(tempfile.gettempdir(), "kinwise-gp-question.png"))
 
         await card(echo).get_by_role("button", name="Review privacy").click()
@@ -84,11 +87,21 @@ async def main():
         check("never your words" in txt.lower() and "Meera" in txt, "Review privacy explains what is shared (never your words; who is told)")
         check(api("GET", "/tv/state")["watch"]["state"] == "offered" and not notices(), "Review privacy changed nothing")
 
-        await card(echo).get_by_role("button", name="Turn on").click()
-        await echo.wait_for_timeout(2500)
+        await ask(echo, "Yes, turn it on")
         st = api("GET", "/tv/state")
-        check(st["watch"]["state"] == "on" and st["today"]["safety"]["level"] == "high", "Turn on starts the six-hour watch (server and TV state agree)")
-        check([n["kind"] for n in notices()] == ["risk_high"], "Meera got exactly one safety signal, only after Turn on")
+        check(st["watch"]["state"] == "offered" and st["today"]["safety"]["level"] == "none" and not notices(),
+              "Saying 'turn it on' to Alexa starts nothing and tells nobody", f"watch={st['watch']['state']}")
+        try:
+            await tv.locator('[data-testid="watch-offer-overlay"]').wait_for(timeout=10_000)
+            check(True, "The question is waiting on the TV")
+        except PlaywrightTimeout:
+            check(False, "The question is waiting on the TV")
+        await tv.screenshot(path=os.path.join(tempfile.gettempdir(), "kinwise-gp-tv-question.png"))
+        await tv.locator('[data-testid="focusable:Turn on a 6 hour safety watch"]').click()
+        await tv.wait_for_timeout(2500)
+        st = api("GET", "/tv/state")
+        check(st["watch"]["state"] == "on" and st["today"]["safety"]["level"] == "high", "Turn on, pressed on the TV, starts the six-hour watch (server and TV state agree)")
+        check([n["kind"] for n in notices()] == ["risk_high"], "Meera got exactly one safety signal, only after Turn on on the TV")
 
         await echo.get_by_role("button", name="Ring the doorbell").click()
         try:
@@ -128,8 +141,7 @@ async def main():
         echo = await ctx.new_page()
         await echo.goto(ECHO)
         await ask(echo, CALL)
-        await card(echo).get_by_role("button", name="Turn on").click()
-        await echo.wait_for_timeout(2000)
+        api("POST", "/tv/watch", "dev-tv", {"choice": "turn_on"})  # answered on the TV, then the TV app is closed before the doorbell
         await echo.get_by_role("button", name="Ring the doorbell").click()
         await echo.wait_for_timeout(3000)
         st = api("GET", "/tv/state")

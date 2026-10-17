@@ -21,7 +21,7 @@ What is simulated, and said so on screen: the Alexa+ surface (the Echo simulator
 |---|---|---|---|
 | 0:00–0:15 | The **Pause** full screen on the Vega device, spoken | `take6/vega` 0:25–0:40 (+ `vega-simulator-with-voice.mp4`) | The hook: a scam in two steps, and one device that knows both. |
 | 0:15–0:40 | Asha asks Alexa: "is this call real?"; the card lists the warning signs | `take5` Echo 0:38–0:62 | What Kinwise noticed, kindly. Only categories are kept, never her words. |
-| 0:30–0:40 | **Asha is asked**, not told: "turn on a 6-hour safety watch, and tell Meera if it looks serious?" She says Turn on | Echo question card (re-record on the current build) | Consent is hers; "Not now" keeps everything off. |
+| 0:30–0:40 | **Asha is asked**, not told: "turn on a 6-hour safety watch, and tell Meera if it looks serious?" She presses **Turn on on the TV** (saying it to Alexa only points her to the TV) | Echo question card and the TV sheet (re-record on the current build) | Consent is hers and only her authenticated TV can start it; "Not now" keeps everything off. |
 | 0:40–1:00 | The doorbell rings; the TV pauses and says *why* | `take5` TV 1:04–1:20 | The link between the earlier call and the visitor is the idea. |
 | 1:00–1:30 | Call Meera → "Telling Meera now" → Meera's phone gets the e-mail with **I'm calling now** → her note on the TV, read aloud | `take5` 1:20–1:35 (TV and Echo) + **your phone clip** of the real e-mail | The family is told for real, and Asha sees the answer. |
 | 1:30–1:45 | Nobody answers: the chip turns amber, then "please call Meera yourself" | `take6/browser-unanswered/tv-unanswered-condensed.mp4` | It never promises help that is not coming. |

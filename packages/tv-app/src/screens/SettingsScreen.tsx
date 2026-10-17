@@ -82,7 +82,7 @@ export function SettingsScreen({
     if (offer) {
       announce(
         `Kinwise has a question. Would you like a ${offer.hours}-hour safety watch for your front door${
-          offer.notifies ? `, and to tell ${offer.notifies} if it looks serious` : ''
+          offer.notifies ? (offer.tellsNow ? `, and to send ${offer.notifies} a short message right away` : `, and to tell ${offer.notifies} if it looks serious`) : ''
         }? Turn on, or Not now.`,
       );
     }
@@ -218,7 +218,7 @@ export function SettingsScreen({
                 <Section title="Turn on a safety watch?" icon="shield-alert" color={colors.coral} tone="caution">
                   <Text style={[type.body, styles.sectionText]}>
                     {`Kinwise noticed warning signs of a scam. Would you like a ${offer.hours}-hour safety watch for your front door` +
-                      (offer.notifies ? `, and to tell ${offer.notifies} if it looks serious?` : '?')}
+                      (offer.notifies ? (offer.tellsNow ? `, and to send ${offer.notifies} a short message right away?` : `, and to tell ${offer.notifies} if it looks serious?`) : '?')}
                   </Text>
                   <Text style={[type.small, styles.sectionText]}>
                     {`Nothing is turned on, and nobody is told, unless you choose Turn on. Kinwise keeps only the kinds of warning sign, never your words, and never says who anyone is.`}

@@ -85,6 +85,9 @@ export interface ScreeningView {
 /** How long a safety-watch question stays open, and how long "Not now" is respected before Kinwise may ask again. */
 export const WATCH_OFFER_MS = 30 * 60_000;
 export const WATCH_DECLINE_MS = 60 * 60_000;
+/** An offer keeps at most this many category labels in total, and a repeated answer is recognised for this long. */
+export const WATCH_OFFER_MAX_LABELS = 10;
+export const WATCH_REPLAY_MS = 10 * 60_000;
 export const WATCH_CHOICES = ['turn_on', 'not_now', 'review_privacy'] as const;
 export type WatchChoice = (typeof WATCH_CHOICES)[number];
 
@@ -93,7 +96,7 @@ export interface WatchView {
   state: 'none' | 'offered' | 'on' | 'declined';
   untilLabel?: string;
   /** Who would be told if it looks serious: absent when family alerts are off. */
-  offer?: { id: string; hours: number; expiresAt: string; notifies?: string };
+  offer?: { id: string; hours: number; expiresAt: string; notifies?: string; /** True when turning it on messages `notifies` at once (the signs already add up to high). */ tellsNow: boolean };
 }
 
 export interface WatchResult {
@@ -102,6 +105,8 @@ export interface WatchResult {
   message: string;
   /** Only for "review privacy": what turning the watch on does and does not share. */
   privacy?: string[];
+  /** A spoken "turn on" cannot be verified as hers, so nothing started: she must confirm on her authenticated TV. */
+  needsTv?: boolean;
 }
 
 export interface TvStateView {
@@ -221,7 +226,7 @@ export class KinwiseService {
   // ───────────────────────────── infrastructure ─────────────────────────────
 
   async createHousehold(state: HouseholdState): Promise<void> {
-    await this.store.save({ ...state, version: 1 }, 0);
+    await this.store.save({ ...state, consentModel: 2, version: 1 }, 0);
   }
 
   async exists(householdId: string): Promise<boolean> {
@@ -235,11 +240,24 @@ export class KinwiseService {
   }
 
   private async read(householdId: string): Promise<{ state: HouseholdState; now: Date }> {
-    const state = await this.store.load(householdId);
-    if (!state) throw new NotFoundError(`Unknown household ${householdId}`);
-    const now = this.clock.now();
-    expireAlerts(state, now);
-    return { state, now };
+    for (let attempt = 0; ; attempt++) {
+      const state = await this.store.load(householdId);
+      if (!state) throw new NotFoundError(`Unknown household ${householdId}`);
+      const now = this.clock.now();
+      expireAlerts(state, now);
+      // Expired questions (with their signs), unconsented legacy watches and old "shown" lines are removed from the stored
+      // document right away, not just hidden: a plain read, such as the TV's two-second poll, makes the deletion durable once.
+      if (!settleConsentState(state, now)) return { state, now };
+      const expected = state.version;
+      state.version = expected + 1;
+      try {
+        await this.store.save(state, expected);
+        return { state, now };
+      } catch (err) {
+        if (err instanceof ConflictError && attempt < 3) continue;
+        throw err;
+      }
+    }
   }
 
   /** Load → mutate draft → cap → save with optimistic concurrency; notices are sent only after a successful save. */
@@ -274,6 +292,11 @@ export class KinwiseService {
 
   private requireResident(actor: Identity): void {
     if (!actsAsResident(actor)) throw new PermissionError('Only the resident can do this');
+  }
+
+  /** Only the living-room TV (role device) can say what its screen did. */
+  private requireDevice(actor: Identity): void {
+    if (actor.role !== 'device') throw new PermissionError('Only the TV can report that a Pause appeared');
   }
 
   private requirePerson(actor: Identity): void {
@@ -384,20 +407,47 @@ export class KinwiseService {
       return;
     }
     if (s.watchDeclinedUntil && Date.parse(s.watchDeclinedUntil) > now.getTime()) return;
-    const expiresAt = addMinutes(now, WATCH_OFFER_MS / 60_000);
+    // A watch that cannot see the door would only mislead her: with door awareness off nothing is offered.
+    if (!s.consent.doorAwareness) return;
     const open = openOffer(s, now);
+    // A lone weak sign could not open a watch, so nothing is asked and nothing is kept before she has agreed to anything.
+    if (accumulate([signal, ...(open?.signals ?? [])], now).level === 'none') return;
     if (open) {
-      open.signals.unshift(signal);
-      open.expiresAt = expiresAt;
+      // The deadline never moves: labels are held for at most 30 minutes from the first one, however many more join.
+      open.signals = capLabels([signal, ...open.signals], WATCH_OFFER_MAX_LABELS);
       return;
     }
-    s.watchOffer = { id: this.ids('offer'), createdAt: now.toISOString(), expiresAt, signals: [signal] };
+    const expiresAt = addMinutes(now, WATCH_OFFER_MS / 60_000);
+    s.watchOffer = { id: this.ids('offer'), createdAt: now.toISOString(), expiresAt, signals: capLabels([signal], WATCH_OFFER_MAX_LABELS) };
   }
 
   /** Her answer to the safety-watch question (`offerId` omitted = the one open question). Only she (or her TV) can give it; a repeat does nothing twice. */
   async respondToWatch(actor: Identity, offerId: string | undefined, choice: WatchChoice): Promise<WatchResult> {
     this.requireResident(actor);
     if (!WATCH_CHOICES.includes(choice)) throw new ValidationError('choice must be turn_on, not_now or review_privacy');
+    if (choice === 'review_privacy') {
+      // Plain information, available whenever she asks, with or without a question open. It changes and writes nothing.
+      const { state, now } = await this.read(actor.householdId);
+      return { watch: watchView(state, now), riskWindow: safetyView(state, now), message: 'Here is what the safety watch does.', privacy: privacyLines(state, now) };
+    }
+    if (choice === 'turn_on' && actor.role !== 'device') {
+      // Over Alexa the hub cannot tell who is speaking, and turning the watch on also tells family. Only the TV, which is
+      // authenticated as hers, can confirm. This is read-only: it changes and sends nothing.
+      const { state, now } = await this.read(actor.householdId);
+      const open = openOffer(state, now);
+      if (!open || (offerId !== undefined && open.id !== offerId)) {
+        if (isWindowActive(state.riskWindow, now) && state.riskWindow?.consentedAt) {
+          return { watch: watchView(state, now), riskWindow: safetyView(state, now), message: 'The safety watch is already on.' };
+        }
+        throw new ValidationError('That question has run out, so nothing was changed.');
+      }
+      return {
+        watch: watchView(state, now),
+        riskWindow: safetyView(state, now),
+        needsTv: true,
+        message: "I can't tell from here that it's you, so I can't turn it on. You can answer on your TV, in Settings and privacy, or say not now.",
+      };
+    }
     return this.mutate(actor.householdId, (s, now, pending) => {
       const name = resident(s).name;
       const family = s.consent.caregiverAlerts ? primaryCaregiverName(s) : undefined;
@@ -406,23 +456,34 @@ export class KinwiseService {
       const open = openOffer(s, now);
       if (!open || (offerId !== undefined && open.id !== offerId)) {
         const last = s.lastWatchAnswer;
-        if (offerId !== undefined && last?.offerId === offerId && last.choice === choice) {
-          return view(choice === 'turn_on' ? 'The safety watch is already on.' : "Okay, it's still off.");
+        const repeat =
+          !!last && last.choice === choice && (offerId === undefined || last.offerId === offerId) &&
+          now.getTime() - Date.parse(last.at) < WATCH_REPLAY_MS;
+        if (repeat) {
+          // The same answer again does nothing twice, and the words follow what is true now, not what was true then.
+          if (choice === 'not_now') return view("Okay, it's still off.");
+          return view(
+            isWindowActive(s.riskWindow, now)
+              ? 'The safety watch is already on.'
+              : 'That safety watch has ended. I will only ask again if there are new warning signs.',
+          );
         }
-        throw new ValidationError('That question has run out. Ask me about the call again if you still want a safety watch.');
+        throw new ValidationError('That question has run out, so nothing was changed.');
       }
-
-      if (choice === 'review_privacy') return view('Here is what the safety watch does.', privacyLines(s, now));
 
       s.lastWatchAnswer = { offerId: open.id, choice: choice as 'turn_on' | 'not_now', at: now.toISOString() };
       s.watchOffer = undefined;
       if (choice === 'not_now') {
         s.watchDeclinedUntil = addMinutes(now, WATCH_DECLINE_MS / 60_000);
         addTimeline(s, now, 'watch_declined', `${name} chose not to turn on a safety watch.`);
-        return view("Okay, I won't turn it on. I'm here if you change your mind.");
+        return view("Okay, I won't turn it on, and I won't ask again for an hour.");
       }
 
       s.watchDeclinedUntil = undefined;
+      if (accumulate([...open.signals, ...s.signals], now).level === 'none') {
+        // The offered signs can no longer open a watch (they aged out): record nothing and say so.
+        return view('I could not start a safety watch from that, so nothing is on and nobody was told.');
+      }
       for (const sig of [...open.signals].reverse()) {
         s.signals.unshift(sig);
         addTimeline(
@@ -436,8 +497,13 @@ export class KinwiseService {
       }
       addTimeline(s, now, 'watch_on', `${name} turned on a safety watch.`);
       this.applyWindow(s, now, pending);
-      const until = s.riskWindow ? formatClock(new Date(s.riskWindow.expiresAt), s.household.timezone) : '';
-      return view(`The safety watch is on until ${until}.${family ? ` I'll tell ${family} if it looks serious.` : ''}`);
+      if (!s.riskWindow || !isWindowActive(s.riskWindow, now)) {
+        return view('I could not start a safety watch from that, so nothing is on and nobody was told.');
+      }
+      s.riskWindow.consentedAt = now.toISOString();
+      const until = formatClock(new Date(s.riskWindow.expiresAt), s.household.timezone);
+      const toldNow = pending.notices.length > 0; // applyWindow queued a message because the signs already add up to high
+      return view(`The safety watch is on until ${until}.${family ? (toldNow ? ` I've told ${family}.` : ` I'll tell ${family} if it looks serious.`) : ''}`);
     });
   }
 
@@ -561,13 +627,17 @@ export class KinwiseService {
    * "shown" (it does not mean she looked). Repeats are harmless: the first one counts.
    */
   async markAlertShown(actor: Identity, alertId: string): Promise<void> {
-    this.requireResident(actor);
+    this.requireDevice(actor);
+    // A repeat report (the TV may retry or re-render) is answered from a read: no write, so it never competes with a door event.
+    const { state } = await this.read(actor.householdId);
+    const seen = state.alerts.find((a) => a.id === alertId);
+    if (!seen) throw new NotFoundError('No such alert');
+    if (seen.kind !== 'pause' || seen.shownAt) return;
     await this.mutate(actor.householdId, (s, now) => {
       const alert = s.alerts.find((a) => a.id === alertId);
-      if (!alert) throw new NotFoundError('No such alert');
-      if (alert.kind !== 'pause' || alert.shownAt) return;
+      if (!alert || alert.kind !== 'pause' || alert.shownAt) return;
       alert.shownAt = now.toISOString();
-      addTimeline(s, now, 'pause_shown', `The Pause appeared on ${resident(s).name}'s TV.`);
+      addTimeline(s, now, 'pause_shown', `The TV app reported that the Pause was on screen at ${resident(s).name}'s TV.`);
     });
   }
 
@@ -610,7 +680,14 @@ export class KinwiseService {
     if (onboarded !== undefined && typeof onboarded !== 'boolean') throw new ValidationError('onboarded must be true or false');
     return this.mutate(actor.householdId, (s, now) => {
       s.consent = { ...s.consent, ...updates };
-      if (!s.consent.scamScreening) s.watchOffer = undefined;
+      if (!s.consent.scamScreening) {
+        s.watchOffer = undefined;
+        s.signals = [];
+        if (isWindowActive(s.riskWindow, now)) {
+          s.riskWindow = closeRiskWindow(s.riskWindow, now, 'Resident turned off scam screening');
+          addTimeline(s, now, 'window_closed', `${resident(s).name} turned off scam screening, so the safety watch ended.`);
+        }
+      }
       if (onboarded) s.consent.onboardedAt ??= now.toISOString();
       addTimeline(s, now, 'consent_changed', `${resident(s).name} updated Kinwise settings.`);
       return s.consent;
@@ -727,10 +804,10 @@ export class KinwiseService {
         last.kind !== 'pause'
           ? ''
           : view.delivery === 'shown'
-            ? ' The Pause appeared on the TV.'
+            ? ' The TV app reported that the Pause was on screen.'
             : view.delivery === 'not_confirmed'
-              ? ' The TV has not confirmed that the Pause appeared, so it may not have been seen.'
-              : ' Kinwise sent it to the TV and is waiting for the TV to confirm it appeared.';
+              ? ' The TV app has not reported that the Pause was on screen, so it may not have been seen.'
+              : ' Kinwise sent it to the TV and is waiting for the TV app to report it on screen.';
       const outcome = last.resolution
         ? `${shown} ${resident(s).name} chose "${resolutionLabel(last.resolution, view.caregiverName)}" at ${view.resolvedLabel}.`
         : last.status === 'active'
@@ -762,7 +839,7 @@ export class KinwiseService {
       });
     }
     const { state, now } = await this.read(actor.householdId);
-    return timelineView(state, when ?? now, resident(state).name);
+    return timelineView(state, when ?? now, resident(state).name, true);
   }
 
   // ───────────────────────────── door events ─────────────────────────────
@@ -1117,7 +1194,8 @@ export function watchView(s: HouseholdState, now: Date): WatchView {
   const open = openOffer(s, now);
   if (open) {
     const notifies = s.consent.caregiverAlerts ? primaryCaregiverName(s) : undefined;
-    return { state: 'offered', offer: { id: open.id, hours: RISK_WINDOW_HOURS, expiresAt: open.expiresAt, notifies } };
+    const tellsNow = !!notifies && accumulate(open.signals, now).level === 'high';
+    return { state: 'offered', offer: { id: open.id, hours: RISK_WINDOW_HOURS, expiresAt: open.expiresAt, notifies, tellsNow } };
   }
   if (s.watchDeclinedUntil && Date.parse(s.watchDeclinedUntil) > now.getTime()) return { state: 'declined' };
   return { state: 'none' };
@@ -1128,12 +1206,65 @@ function privacyLines(s: HouseholdState, now: Date): string[] {
   const until = formatClock(new Date(addMinutes(now, RISK_WINDOW_HOURS * 60)), s.household.timezone);
   const family = primaryCaregiverName(s);
   return [
-    'Kinwise keeps only the kinds of warning sign it noticed, never your words.',
-    `If you turn it on, it pays closer attention to the front door until about ${until}.`,
+    'Kinwise keeps only the kinds of warning sign it noticed, never your words. Until you answer it holds them for at most 30 minutes, then deletes them. Automatic database backups can keep an earlier copy for up to 35 days.',
+    `If you turn it on, it pays closer attention to the front door until about ${until}. If more warning signs appear while it is on, it can stay on longer, and you can end it at any time.`,
     "If someone you don't expect arrives, your TV shows a Pause and says why. It never says who the person is.",
     s.consent.caregiverAlerts
-      ? `${family} is told only if it looks serious, with a short message and no recordings or what you said.`
+      ? `${family} is messaged right away if the warning signs already add up to serious, or later if they become serious: a short message with no recordings and none of what you said.`
       : `${family} would not be told, because family alerts are off.`,
-    'You can end the watch on your TV or by asking me, or use privacy time, at any moment.',
+    'If you say not now, Kinwise forgets the warning signs and keeps only a note, visible to you alone, that you declined.',
+    'To turn it on, press Turn on on your TV. Kinwise cannot tell who is speaking through Alexa, so it never starts a watch, or tells family, from a voice alone.',
+    'You can end the watch on your TV, in Settings and privacy, at any moment. Privacy time also stops the Pause for a while, but it does not end the watch.',
   ];
+}
+
+/**
+ * Old or expired consent state, tidied whenever a household is read (written back with the next change):
+ * an unanswered question that has run out is deleted with its warning signs; a watch that an older version opened by
+ * itself (it has no `consentedAt`) is closed, because nobody agreed to it; and "Pause was shown" lines written at
+ * send time, before the TV could confirm anything, are relabelled "sent".
+ */
+function settleConsentState(s: HouseholdState, now: Date): boolean {
+  let changed = false;
+  if (s.watchOffer && Date.parse(s.watchOffer.expiresAt) <= now.getTime()) {
+    s.watchOffer = undefined;
+    changed = true;
+  }
+  if (s.watchDeclinedUntil && Date.parse(s.watchDeclinedUntil) <= now.getTime()) {
+    s.watchDeclinedUntil = undefined;
+    changed = true;
+  }
+  // One-time migration for households from before the explicit-consent model: whatever warning signs were stored then were
+  // stored without anyone being asked, so they are dropped and cannot feed a later watch.
+  if (s.consentModel !== 2) {
+    if (s.signals.length > 0) s.signals = [];
+    s.consentModel = 2;
+    changed = true;
+  }
+  if (s.riskWindow && !s.riskWindow.closedAt && !s.riskWindow.consentedAt) {
+    s.riskWindow = closeRiskWindow(s.riskWindow, now, 'Opened before Kinwise asked first, so it was not kept');
+    s.signals = [];
+    s.timeline.unshift({ at: now.toISOString(), kind: 'window_closed', text: 'A safety watch that started before Kinwise asked first was closed. Kinwise now asks before it starts one.' });
+    changed = true;
+  }
+  for (const e of s.timeline) {
+    if (e.kind === 'pause_shown' && e.text.startsWith('The Pause was shown on')) {
+      e.kind = 'pause_sent';
+      e.text = e.text.replace('The Pause was shown on', 'A Pause was sent to');
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+/** Keep the newest records whose category labels add up to at most `max` (always at least the newest record). */
+function capLabels(signals: SignalRecord[], max: number): SignalRecord[] {
+  const kept: SignalRecord[] = [];
+  let labels = 0;
+  for (const sig of signals) {
+    if (kept.length > 0 && labels + sig.categories.length > max) break;
+    kept.push(sig);
+    labels += sig.categories.length;
+  }
+  return kept;
 }

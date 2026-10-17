@@ -101,7 +101,7 @@ export interface AccessLogEntry {
 export interface WatchView {
   state: 'none' | 'offered' | 'on' | 'declined';
   untilLabel?: string;
-  offer?: {id: string; hours: number; expiresAt: string; notifies?: string};
+  offer?: {id: string; hours: number; expiresAt: string; notifies?: string; tellsNow?: boolean};
 }
 
 export type WatchChoice = 'turn_on' | 'not_now' | 'review_privacy';

@@ -14,6 +14,7 @@ import {callFailedLine, callingLine, narration} from './logic/narration';
 import {selectScreen} from './logic/selectScreen';
 import {ExpectedToast} from './overlays/ExpectedToast';
 import {GentleOverlay} from './overlays/GentleOverlay';
+import {WatchOfferOverlay} from './overlays/WatchOfferOverlay';
 import {CALLING_CONFIRMATION_MS, CALLING_FAILED_MS, CallingScreen} from './screens/CallingScreen';
 import {HomeScreen} from './screens/HomeScreen';
 import {LoadingScreen} from './screens/LoadingScreen';
@@ -119,7 +120,8 @@ export function App({client: injected}: AppProps = {}) {
   );
 
   const state = hub.state;
-  const selection = state ? selectScreen(state, {hiddenAlertIds: hidden}) : undefined;
+  const [hiddenOfferId, setHiddenOfferId] = useState<string | undefined>(undefined);
+  const selection = state ? selectScreen(state, {hiddenAlertIds: hidden, hiddenWatchOfferId: hiddenOfferId}) : undefined;
 
   // The TV talks: say what changed, wherever it came from (remote, Alexa, Meera's phone, the doorbell).
   const spokenRef = useRef<TvStateView | undefined>(undefined);
@@ -144,17 +146,31 @@ export function App({client: injected}: AppProps = {}) {
   useEffect(() => {
     const id = showPause ? alert?.id : undefined;
     if (!id || alert?.kind !== 'pause' || alert.delivery === 'shown' || reportedPause.current === id) return;
-    client.pauseShown(id).then(
-      () => {
-        reportedPause.current = id;
-      },
-      () => undefined,
-    );
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const attempt = (n: number) => {
+      client.pauseShown(id).then(
+        () => {
+          reportedPause.current = id;
+        },
+        () => {
+          // A failed report is retried with a growing pause (2 s, 4 s, ... up to 10 s, eight tries), so a Pause she really saw
+          // is not left looking "not confirmed" because of one dropped request.
+          if (!cancelled && n < 8) timer = setTimeout(() => attempt(n + 1), Math.min(2000 * n, 10000));
+        },
+      );
+    };
+    attempt(1);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [client, showPause, alert?.id, alert?.kind, alert?.delivery]);
 
   const gentle = !calling && !showPause && selection?.overlay === 'gentle' ? alert : undefined;
   const expected = !calling && !showPause && selection?.overlay === 'expected' ? alert : undefined;
-  const baseActive = !gentle;
+  const watchOffer = !calling && !showPause && !gentle && !expected && selection?.overlay === 'watch' ? state?.watch?.offer : undefined;
+  const baseActive = !gentle && !watchOffer;
 
   // Leaving Settings when something more important takes over keeps Back predictable.
   useEffect(() => {
@@ -293,6 +309,12 @@ export function App({client: injected}: AppProps = {}) {
       void respond(gentle, 'dismiss');
       return true;
     }
+    if (watchOffer) {
+      // Back never answers for her: it only tucks the sheet away. The question stays in Settings & privacy until it runs out.
+      setHiddenOfferId(watchOffer.id);
+      announce('The question stays in Settings and privacy. Nothing was turned on.');
+      return true;
+    }
     if (route === 'settings') {
       setRoute('home');
       return true;
@@ -368,6 +390,14 @@ export function App({client: injected}: AppProps = {}) {
             alert={gentle}
             busyAction={busyKey?.startsWith('alert:') ? (busyKey.slice(6) as AlertAction) : null}
             onRespond={(action) => void respond(gentle, action)}
+          />
+        ) : null}
+        {watchOffer ? (
+          <WatchOfferOverlay
+            key={watchOffer.id}
+            offer={watchOffer}
+            busy={busyKey?.startsWith('watch:') ? (busyKey.slice(6) as WatchChoice) : null}
+            onAnswer={(choice) => void answerWatch(choice, watchOffer.id)}
           />
         ) : null}
         {expected ? (

@@ -108,6 +108,8 @@ export interface RiskWindow {
   expiresAt: string;
   level: Exclude<RiskLevel, 'none'>;
   categories: SignalCategory[];
+  /** Set when the resident answered "turn on". A window without it was opened by an older version on its own and is not honoured. */
+  consentedAt?: string;
   closedAt?: string;
   closedReason?: string;
 }
@@ -243,6 +245,8 @@ export interface HouseholdState {
   expectedVisits: ExpectedVisit[];
   signals: SignalRecord[];
   riskWindow?: RiskWindow;
+  /** 2 = this household has been through the explicit-consent migration (see settleConsentState). Absent on households from before it. */
+  consentModel?: 2;
   /** The open question, if any (spec §5.4). Cleared on any answer, on expiry and when screening is switched off. */
   watchOffer?: WatchOffer;
   /** After "Not now" Kinwise does not ask again until this time. */

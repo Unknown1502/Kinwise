@@ -68,11 +68,17 @@ Categories from every screened text (reminders and "is this legit?" checks) are 
 
 ### 5.4 Risk window (the safety watch) and the resident's choice
 
-- **Nothing starts by itself.** A call or reminder that matches warning signs only **offers** a watch (`watchOffer`, 30 minutes to answer, holding category labels and times, never words). Asha chooses: **Turn on** (the watch opens, and family is told if it looks serious), **Not now** (nothing is stored as a signal, nothing is sent, and Kinwise does not ask again for an hour), or **Review privacy** (a plain list of what the watch shares; changes nothing). She can answer by voice (Alexa) or on the TV. A caregiver, or the discovery-only service identity, cannot answer for her.
+- **Nothing starts by itself.** A call or reminder that matches warning signs only **offers** a watch (`watchOffer`, 30 minutes to answer, holding at most ten category labels in total with levels and times, never words; the deadline is fixed at 30 minutes from the first sign and never moves when more signs join; the labels are deleted from the stored document on answer, on expiry, on revocation and on the next read after they expire, which writes the deletion once. DynamoDB point-in-time recovery is on for the demo table, so an automatic backup can keep an earlier copy for up to 35 days). Asha chooses: **Turn on** (the watch opens, and family is told if it looks serious; **only her authenticated TV can do this**), **Not now** (no warning signs or categories are kept and nothing is sent; Kinwise keeps only three facts with no content: a line in her own timeline that she declined, the time before which it will not ask again, and the id of her last answer so that a repeat does nothing twice; none of the three says why she was asked), or **Review privacy** (a plain list of what the watch shares; changes nothing). **Not now** and **Review privacy** can be said to Alexa. A spoken **Turn on** cannot start a watch: the hub cannot verify who is speaking, and turning it on also tells family, so the tool returns `needsTv` and changes and sends nothing; the question is shown on the TV as a sheet (Not now is focused) and in Settings & privacy. A caregiver, the discovery-only service identity and any other identity cannot answer for her.
 - Opens when she turns it on and the accumulated level is `elevated` or `high`. The default duration is **6 hours** (`RISK_WINDOW_HOURS`). While a watch she turned on is running, a new warning extends or upgrades it without another question.
 - Upgrades from elevated to high when new signals arrive. Expiry extends to `max(current, now + 6h)`.
 - Only Asha (resident scope) can close it early. The reason is logged.
-- Turning **scam screening** off withdraws a pending question and its signs; turning **door awareness** off or using **privacy time** stops the Pause (spec §5.6, rule 1).
+- Turning **scam screening** off withdraws a pending question and its signs **and ends a running watch**; turning **door awareness** off or using **privacy time** stops the Pause (spec §5.6, rule 1).
+- A question that nobody answers is **deleted with its warning signs** once its 30 minutes are up, and holds at most ten signs. A single weak sign (one category, which cannot open a watch) starts no question and is not kept at all.
+- A watch carries `consentedAt`. A window that an older version opened by itself has none, is closed the first time the household is read (with a line in her timeline saying so), and never extends or notifies. A household from before this model is migrated once (`consentModel: 2`): the warning signs stored in the automatic era are dropped. Old "Pause was shown" timeline lines (written at send time) are relabelled "sent".
+- What she is told when she agrees matches what happens: if the offered signs already add up to **high**, the question says family will be messaged **right away** and turning on sends that one short message (no recordings, none of what she said); at **elevated** level, family is told only if it later becomes serious. With **door awareness off** nothing is offered, because a watch that cannot see the door would only mislead. "Review privacy" works whenever she asks, with or without a question open, and writes nothing.
+- **The TV credential.** Only the `device` role, issued to exactly one bearer token per household (the TV's: `dev-tv` in dev mode, a derived `kw_tv_…` token when hosted, where `AUTH_MODE` is `cognito`; Cognito can never issue `device`), can turn a watch on or report a Pause as shown, and that token cannot call MCP tools (`watch-consent` R14). It proves the request came from the TV app holding the token, not that a particular person is in the room. A long-lived bearer token on the TV is the trust boundary: keep it only on the TV, and rotate it by changing the secret seed.
+- **"Shown" means the TV app reported it.** The app reports once its Pause screen is on screen (retrying with backoff if a request fails). Kinwise cannot tell whether the TV panel is on, whether another app is in front, or whether she looked, and says only that "the TV app reported that the Pause was on screen".
+- The same answer again (with or without the offer's id, within 10 minutes) does nothing twice, and its wording follows the current state ("already on" only if the watch is still on). Pressing Back on the TV sheet only tucks it away; it answers nothing, and the question waits in Settings & privacy until it runs out.
 - The timeline records `watch_on` and, for Asha only, `watch_declined`, as facts without content.
 
 ### 5.5 Expected visits
@@ -119,7 +125,7 @@ Tools are scoped by role, taken from the token's `role` claim. Every tool return
 |---|---|---|---|
 | `kinwise_add_reminder {text, at}` | resident | write, not destructive | `ui://kinwise/screening` |
 | `kinwise_check_call {description}` | resident | write (stores category labels, may offer a watch), not destructive | `ui://kinwise/screening` |
-| `kinwise_set_safety_watch {offerId?, choice}` | resident | write; `turn_on` · `not_now` · `review_privacy`; visible to model and app | `ui://kinwise/screening` |
+| `kinwise_set_safety_watch {offerId?, choice}` | resident | write; `not_now` · `review_privacy` act; `turn_on` returns `needsTv` and does nothing (only the TV device can turn a watch on); visible to model and app | `ui://kinwise/screening` |
 | `kinwise_get_today {}` | resident, caregiver | read-only | `ui://kinwise/today` |
 | `kinwise_add_expected_visit {label, weekday?, date?, start, end}` | resident (active), caregiver (proposed) | write | — |
 | `kinwise_respond_to_alert {alertId, action}` | resident | write; visible to model and app | `ui://kinwise/pause` |
@@ -140,8 +146,8 @@ Auth follows the Alexa+ two-tier model:
 
 - `GET /tv/state` → `{household, resident, caregiver, today, activeAlert, pendingProposals, consent, watch, privacyHourUntil, accessLog, serverTime}`. Here `today` carries the date and time labels, `reminders`, `visits`, `messages` and `safety` (the risk window level and "until" label).
 - `POST /tv/alerts/:id/respond {action: call_family|known_person|dismiss}`
-- `POST /tv/watch {choice, offerId?}`: her answer to the safety-watch question on the TV
-- `POST /tv/alerts/:id/shown`: the TV says the Pause is on screen (until then it is only "sent")
+- `POST /tv/watch {choice, offerId?}`: her answer to the safety-watch question on the TV (the only place `turn_on` takes effect)
+- `POST /tv/alerts/:id/shown`: the TV says the Pause is on screen (until then it is only "sent"). Only the TV device identity may report this; a resident token is refused
 - `POST /tv/alerts/:id/seen` quietly clears an *expected-visitor* notice (no timeline entry)
 - `POST /tv/visits {label, recurrence}`: the resident remembers a visitor ("I know this person")
 - `POST /tv/proposals/:id {decision: approve|decline}`

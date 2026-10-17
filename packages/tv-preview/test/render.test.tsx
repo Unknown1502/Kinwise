@@ -203,38 +203,56 @@ describe('the safety-watch question', () => {
     watch: {state: 'offered', offer: {id: 'offer_1', hours: 6, expiresAt: '2026-10-05T18:49:00.000Z', notifies: 'Meera'}},
   });
 
-  it('tells her on the home screen that nothing is on yet', async () => {
-    render(<App client={fakeHub(asked()).client} />);
-    await screen.findByTestId('home-screen');
-    expect(screen.getByText('Kinwise has a question')).toBeTruthy();
-    expect(screen.getByText('Open Settings & privacy to answer. Nothing is on yet')).toBeTruthy();
-  });
-
-  it('asks in Settings, says what is and is not shared, and starts nothing by itself', async () => {
+  it('puts the question on Home as a sheet, says what is and is not shared, and starts nothing by itself', async () => {
     const hub = fakeHub(asked());
     render(<App client={hub.client} />);
-    await screen.findByTestId('home-screen');
-    await focusOn('Settings & privacy');
-    press('Enter');
-    await screen.findByTestId('settings-screen');
-    expect(screen.getByText('Turn on a safety watch?')).toBeTruthy();
-    expect(screen.getByText(/6-hour safety watch for your front door, and to tell Meera if it looks serious/)).toBeTruthy();
+    expect(await screen.findByTestId('watch-offer-overlay')).toBeTruthy();
+    expect(screen.getAllByText('Kinwise has a question').length).toBeGreaterThan(0);
+    expect(screen.getByText(/6-hour safety watch for your front door, and tell Meera if it looks serious/)).toBeTruthy();
     expect(screen.getByText(/Nothing is turned on, and nobody is told, unless you choose Turn on/)).toBeTruthy();
     expect(actions(hub.posts)).toEqual([]);
+  });
+
+  it('focuses "Not now", so an accidental OK press starts nothing', async () => {
+    render(<App client={fakeHub(asked()).client} />);
+    await screen.findByTestId('watch-offer-overlay');
+    await focusOn('Not now');
+    expect(isFocused('Turn on a 6 hour safety watch')).toBe(false);
   });
 
   it('"Turn on" and "Not now" send exactly her choice for that question', async () => {
     for (const [label, choice] of [['Turn on a 6 hour safety watch', 'turn_on'], ['Not now', 'not_now']] as const) {
       const hub = fakeHub(asked());
       render(<App client={hub.client} />);
-      await screen.findByTestId('home-screen');
-      await focusOn('Settings & privacy');
-      press('Enter');
-      await screen.findByTestId('settings-screen');
+      await screen.findByTestId('watch-offer-overlay');
       fireEvent.click(screen.getByTestId(`focusable:${label}`));
       await vi.waitFor(() => expect(actions(hub.posts)).toContainEqual({path: '/tv/watch', body: {choice, offerId: 'offer_1'}}));
       cleanup();
     }
+  });
+
+  it('Back only tucks the sheet away: nothing is answered, and the question waits in Settings & privacy', async () => {
+    const hub = fakeHub(asked());
+    render(<App client={hub.client} />);
+    await screen.findByTestId('watch-offer-overlay');
+    press('Escape');
+    await vi.waitFor(() => expect(screen.queryByTestId('watch-offer-overlay')).toBeNull());
+    expect(actions(hub.posts)).toEqual([]);
+    expect(screen.getByText('Open Settings & privacy to answer. Nothing is on yet')).toBeTruthy();
+
+    await focusOn('Settings & privacy');
+    press('Enter');
+    await screen.findByTestId('settings-screen');
+    expect(screen.getByText('Turn on a safety watch?')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('focusable:Turn on a 6 hour safety watch'));
+    await vi.waitFor(() => expect(actions(hub.posts)).toContainEqual({path: '/tv/watch', body: {choice: 'turn_on', offerId: 'offer_1'}}));
+  });
+
+  it('never covers a Pause or a visitor panel: those come first', async () => {
+    const hub = fakeHub({...withAlert(asked(), pauseAlert())});
+    render(<App client={hub.client} />);
+    expect(await screen.findByTestId('pause-screen')).toBeTruthy();
+    expect(screen.queryByTestId('watch-offer-overlay')).toBeNull();
   });
 });
 
@@ -329,6 +347,28 @@ describe('the Pause', () => {
     await vi.waitFor(() => expect(actions(hub.posts).map((p) => p.path)).toEqual(['/tv/alerts/alert_pause_1/shown']));
     await new Promise((r) => setTimeout(r, 2500)); // a few polls later it is not repeated
     expect(actions(hub.posts).filter((p) => p.path.endsWith('/shown'))).toHaveLength(1);
+  });
+
+  it('retries the "shown" report when a request fails, so one dropped request does not leave a seen Pause unconfirmed', async () => {
+    const posts: string[] = [];
+    const hub = new HubClient({
+      baseUrl: 'http://hub.test:8787',
+      token: 'dev-tv',
+      fetchImpl: async (url: string, init?: RequestInit) => {
+        const path = new URL(url).pathname;
+        if ((init?.method ?? 'GET') === 'GET') return new Response(JSON.stringify(withAlert(homeState(), pauseAlert())), {status: 200, headers: {'content-type': 'application/json'}});
+        if (path.endsWith('/shown')) {
+          posts.push(path);
+          if (posts.length === 1) return new Response('{"error":"boom"}', {status: 503, headers: {'content-type': 'application/json'}});
+        }
+        return new Response('{"ok":true}', {status: 200, headers: {'content-type': 'application/json'}});
+      },
+    });
+    render(<App client={hub} />);
+    await screen.findByTestId('pause-screen');
+    await vi.waitFor(() => expect(posts.length).toBe(2), {timeout: 6000});
+    await new Promise((r) => setTimeout(r, 2500));
+    expect(posts.length).toBe(2); // one failure, one success, then it stops
   });
 
   it('does not report a Pause the hub already has as shown', async () => {

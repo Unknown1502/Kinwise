@@ -73,6 +73,16 @@ def test_the_safety_watch_answer_is_only_what_she_said(text, choice):
     assert intent.args == {"choice": choice}
 
 
+def test_a_reminder_containing_the_words_is_still_a_reminder():
+    assert classify("resident", "Remind me to turn it on at six", NOW).tool == "kinwise_add_reminder"
+    assert classify("resident", "remind me, not now, at 5 to call the bank", NOW).tool == "kinwise_add_reminder"
+
+
+def test_a_long_request_containing_not_now_is_not_a_decline():
+    long_request = "I told the man from the bank not now but he keeps calling me and wants a courier to collect my gold"
+    assert classify("resident", long_request, NOW).tool != "kinwise_set_safety_watch"
+
+
 def test_review_privacy_is_not_privacy_time():
     assert classify("resident", "give me an hour of privacy", NOW).tool == "kinwise_set_privacy_hour"
     assert classify("resident", "review privacy", NOW).tool == "kinwise_set_safety_watch"

@@ -43,17 +43,17 @@ const INSTRUCTIONS = `Kinwise is a consent-first family safety add-on for an old
 - When the resident describes a phone call, letter, text or visitor request involving money, a bank, a government agency, gold, gift cards, crypto or a courier, call kinwise_check_call with what was said, in their words. Then read the advice calmly.
 - Route every "remind me…" request from the resident to kinwise_add_reminder. If it returns a followUp, say it.
 - When the resident asks to hear or see their messages or their day "on the TV", call kinwise_read_on_tv; the living-room TV reads it aloud.
-- A flagged call or reminder only OFFERS a safety watch (watch.offer). Ask the resident the question in your own calm words and wait. Only after she answers, call kinwise_set_safety_watch with her choice. Never turn it on for her, never ask twice after "not now", and never choose on a caregiver's behalf.
+- A flagged call or reminder only OFFERS a safety watch (watch.offer). Ask the resident the question in your own calm words and wait. Only after she answers, call kinwise_set_safety_watch with her choice. A spoken "turn it on" cannot start the watch (you cannot verify who is speaking): tell her the question is on her TV and to press Turn on there. Never choose for her, never ask twice after "not now", and never choose on a caregiver's behalf.
 - Never pressure, shame or alarm. Kinwise advises; it never controls. The resident can always dismiss.
 - Family members (caregivers) see signals only: never transcripts, recordings or reminder text.`;
 
 type Card = keyof typeof UI_URIS;
 
 /** The plain-words question Alexa asks. Nothing is turned on, and nobody is told, until she answers "turn on". */
-function watchQuestion(w: { offer?: { hours: number; notifies?: string } }): string {
+function watchQuestion(w: { offer?: { hours: number; notifies?: string; tellsNow?: boolean } }): string {
   if (!w.offer) return '';
-  const tell = w.offer.notifies ? `, and tell ${w.offer.notifies} if it looks serious` : '';
-  return ` Would you like me to turn on a ${w.offer.hours}-hour safety watch for your front door${tell}? You can say turn it on, not now, or review privacy. I won't do it unless you say so.`;
+  const tell = w.offer.notifies ? (w.offer.tellsNow ? `, and send ${w.offer.notifies} a short message right away` : `, and tell ${w.offer.notifies} if it looks serious`) : '';
+  return ` Would you like me to turn on a ${w.offer.hours}-hour safety watch for your front door${tell}? You can say not now or review privacy. To turn it on, press Turn on on your TV, because I can't tell from here that it's you. I won't do it unless you choose it there.`;
 }
 
 function ok(text: string, structured: unknown): CallToolResult {
@@ -141,7 +141,7 @@ export function buildMcpServer(identity: Identity, service: KinwiseService): Mcp
       guard(async ({ text, at }) => {
         const v = await service.addReminder(identity, { text, at });
         const said = `Okay, I'll remind you at ${v.reminder?.timeLabel}: ${v.reminder?.text}.`;
-        return ok(v.followUp ? `${said} ${v.followUp}${watchQuestion(v.watch)}` : said, v);
+        return ok(`${v.followUp ? `${said} ${v.followUp}` : said}${watchQuestion(v.watch)}`, v);
       }),
     );
 
@@ -168,7 +168,7 @@ export function buildMcpServer(identity: Identity, service: KinwiseService): Mcp
             ? `This has the warning signs of a scam: ${signs}. Real banks and agencies never send couriers to collect money. Please don't hand anything over.${ask}`
             : v.level === 'elevated'
               ? `Some of this sounds like a scam (${signs}). Let's check with ${v.caregiverName} before doing anything.${ask}`
-              : "I don't see common scam warning signs. If anything feels off, it's okay to hang up and call back on a number you trust.";
+              : `I don't see common scam warning signs. If anything feels off, it's okay to hang up and call back on a number you trust.${ask}`;
         return ok(text, v);
       }),
     );
@@ -179,7 +179,7 @@ export function buildMcpServer(identity: Identity, service: KinwiseService): Mcp
       {
         title: 'Safety watch: turn on, not now, or review privacy',
         description:
-          "Record the resident's answer to the safety-watch question that kinwise_check_call or kinwise_add_reminder asked (watch.offer.id). Call it only after the resident has said so in her own words: 'turn_on' starts a six-hour watch of the front door (and lets Kinwise tell family if it looks serious), 'not_now' declines it, 'review_privacy' explains exactly what it shares and changes nothing. Never choose for her.",
+          "Record the resident's answer to the safety-watch question that kinwise_check_call or kinwise_add_reminder asked (watch.offer.id). Call it only after the resident has said so in her own words: 'turn_on' from this assistant cannot start anything, because the hub cannot verify who is speaking: it returns needsTv and the resident confirms on her authenticated TV; 'not_now' declines it; 'review_privacy' explains exactly what it shares and changes nothing. Never choose for her.",
         inputSchema: z.object({
           offerId: z.string().optional().describe('The id of the open question (watch.offer.id); leave out for the one open question'),
           choice: z.enum(['turn_on', 'not_now', 'review_privacy']),

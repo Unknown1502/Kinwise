@@ -16,6 +16,8 @@ import { MemoryStore } from '../store/memory.js';
 
 const HH = DEMO_HOUSEHOLD_ID;
 const asha: Identity = { userId: 'asha', householdId: HH, role: 'resident', name: 'Asha', scopes: [] };
+/** Her authenticated TV: the only identity that can turn a watch on. */
+const tv: Identity = { userId: 'tv-living-room', householdId: HH, role: 'device', name: 'Living room TV', scopes: [] };
 
 const CALL = 'A man from the FTC said my accounts are compromised and I should withdraw it as gold. Do not tell my family.';
 const REMINDER = 'Courier from the bank picking up a package';
@@ -140,7 +142,7 @@ async function run(scenario: Scenario): Promise<Row> {
         ? await service.checkCall(asha, { description: CALL })
         : await service.addReminder(asha, { text: REMINDER, at: at('14:00').toISOString() });
       const answer = step.answer ?? 'turn_on';
-      if (v.watch.offer && answer !== 'none') await service.respondToWatch(asha, v.watch.offer.id, answer);
+      if (v.watch.offer && answer !== 'none') await service.respondToWatch(tv, v.watch.offer.id, answer);
     } else if (step.do === 'privacy') await service.setPrivacyHour(asha, step.minutes);
     else if (step.do === 'end_watch') await service.closeRiskWindow(asha, 'Resident ended the safety watch');
     else if (step.do === 'consent') await service.updateConsent(asha, step.set);

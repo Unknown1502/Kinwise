@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // Drive the hero story end to end against a running stack, for rehearsing the demo video:
-//   node scripts/demo-scenario.mjs            # reset → reminder → "is this real?" → Asha says "turn it on" → doorbell → (TV shows the Pause)
+//   node scripts/demo-scenario.mjs            # reset → reminder → "is this real?" → Asha presses Turn on on her TV → doorbell → (TV shows the Pause)
 //   node scripts/demo-scenario.mjs --decline  # the same, but Asha says "Not now": the doorbell then gives only a gentle note
 //   node scripts/demo-scenario.mjs --step 3   # run a single step
 // Uses the hub's /sim/ask bridge (so the concierge + real MCP path is exercised) and the dev doorbell.
 const HUB = (process.env.HUB_URL ?? 'http://localhost:8787').replace(/\/$/, '');
 const ASHA = process.env.RESIDENT_TOKEN ?? 'dev-asha';
 const PRIYA = process.env.CAREGIVER_TOKEN ?? 'dev-priya';
+const TV = process.env.TV_TOKEN ?? 'dev-tv';
 const decline = process.argv.includes('--decline');
 const only = process.argv.includes('--step') ? Number(process.argv[process.argv.indexOf('--step') + 1]) : null;
 const sessionId = `scenario-${Date.now()}`;
@@ -44,9 +45,19 @@ const steps = [
       ),
   ],
   [
-    decline ? '10:21 — Asha is asked about a six-hour safety watch and says "Not now"' : '10:21 — Asha is asked about a six-hour safety watch and says "turn it on" (nothing starts until she does)',
+    decline
+      ? '10:21 — Asha is asked about a six-hour safety watch and says "Not now"'
+      : '10:21 — Asha says "turn it on" to Alexa: nothing starts, because Alexa cannot tell who is speaking',
     () => ask(ASHA, decline ? 'Not now' : 'Yes, turn it on'),
   ],
+  ...(decline
+    ? []
+    : [
+        [
+          '10:22 — Asha presses Turn on on her TV (the only place that can start the watch)',
+          async () => console.log('   📺', JSON.stringify((await post('/tv/watch', { choice: 'turn_on' }, TV)).message)),
+        ],
+      ]),
   [
     decline ? '14:41 — A stranger rings the doorbell (no watch was turned on, so the TV shows only a gentle note)' : '14:41 — A stranger rings the doorbell (the TV should show the Pause now)',
     async () => console.log('   🚪', JSON.stringify(await post('/dev/visitor', { description: 'A person at the front door holding a small box', carrying: 'a small box' }, ASHA))),

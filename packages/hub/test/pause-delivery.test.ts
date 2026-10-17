@@ -37,7 +37,7 @@ describe('a Pause that was sent is not a Pause that was shown', () => {
     service = new KinwiseService({ store: new MemoryStore(), notifier, clock });
     await service.createHousehold(demoHousehold(clock.now()));
     const v = await service.checkCall(asha, { description: CALL });
-    await service.respondToWatch(asha, v.watch.offer!.id, 'turn_on');
+    await service.respondToWatch(tv, v.watch.offer!.id, 'turn_on');
     notifier.outbox.length = 0;
     clock.t = local('14:41');
     alertId = (await service.ingestVisitor(HH, visitor('v1', '14:41'))).alertId!;
@@ -70,17 +70,31 @@ describe('a Pause that was sent is not a Pause that was shown', () => {
     clock.t = local('14:42', 5);
     expect((await service.tvState(tv)).activeAlert?.delivery).toBe('not_confirmed');
     const ex = await service.explainLastAlert(priya);
-    expect(ex.summary).toMatch(/has not confirmed that the Pause appeared/i);
+    expect(ex.summary).toMatch(/TV app has not reported that the Pause was on screen/i);
     expect(ex.summary).not.toMatch(/still showing on the TV/i);
   });
 
   it('S3.2: once the TV confirms, the family is told it appeared', async () => {
     await service.markAlertShown(tv, alertId);
-    expect((await service.explainLastAlert(priya)).summary).toMatch(/appeared on the TV/i);
+    expect((await service.explainLastAlert(priya)).summary).toMatch(/TV app reported that the Pause was on screen/i);
   });
 
   it('S4.1: only her TV or she can confirm; an unknown alert is refused', async () => {
     await expect(service.markAlertShown(priya, alertId)).rejects.toBeInstanceOf(PermissionError);
     await expect(service.markAlertShown(tv, 'alert_nope')).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('S4.2: a resident token cannot claim "shown" either: only the TV device can say the screen was drawn', async () => {
+    await expect(service.markAlertShown(asha, alertId)).rejects.toBeInstanceOf(PermissionError);
+    expect((await service.tvState(tv)).activeAlert?.delivery).toBe('sent');
+  });
+
+  it('S4.3: a repeat report writes nothing (it must not compete with time-critical writes)', async () => {
+    const store = (service as unknown as { store: MemoryStore }).store;
+    await service.markAlertShown(tv, alertId);
+    const v1 = (await store.load(HH))!.version;
+    await service.markAlertShown(tv, alertId);
+    await service.markAlertShown(tv, alertId);
+    expect((await store.load(HH))!.version).toBe(v1);
   });
 });

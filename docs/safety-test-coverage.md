@@ -37,7 +37,7 @@ Every row names a test that fails if it breaks. "Scenario row" means a line in [
 | 4 | Suspicious call, no visitor | watch on, no door event | Nothing on the TV; the watch lapses | One signal at Turn on | — | `service` "a suspicious call with no visitor afterwards…"; scenario row "call-no-visitor" |
 | 5 | Unexpected visitor, no scam signal | visitor, no window → `gentle` | A gentle note | Nothing | — | `domain` "shows a gentle card with no window"; scenario rows 4, 5 |
 | 6 | Expired safety signal | visitor after the 6-hour window → `gentle` | A gentle note (the one reported miss) | Nothing | — | `domain` "forgets signals older than 24 hours"; scenario row 3 |
-| 7 | Resident refusal | **Not now** → no window, signals dropped, no re-ask for an hour | Advice only; later a gentle note | **Nothing** | Nothing stored as a signal | `watch-consent` S2.1, S2.2, S2.3; browser check "Not now…"; scenario rows "watch-declined", "watch-unanswered" |
+| 7 | Resident refusal | **Not now** → no window, warning signs dropped, no re-ask for an hour | Advice only; later a gentle note | **Nothing** | No signs or categories kept. Only three content-free facts remain: a timeline line for Asha alone (hidden from family), the no-ask-until time, her last answer's id | `watch-consent` S2.1, S2.2, S2.3; browser check "Not now…"; scenario rows "watch-declined", "watch-unanswered" |
 | 8 | Revocation before a visitor | she ends the watch, switches screening off, or switches door awareness off | Gentle note or nothing | Nothing new | A pending question and its signs are withdrawn | `watch-consent` S6.3, S7.1; scenario rows "watch-ended", "screening-revoked", "door-revoked" |
 | 9 | Privacy time | privacy hour → `ignored` | Nothing | Nothing | Only a counter | `service` "stores nothing during a privacy hour…"; scenario row 8 |
 | 10 | Duplicate Ring event | same `eventId` twice → second is `ignored` | One Pause | One signal | — | `service` "is idempotent on visitor event ids"; scenario row "duplicate-event" |
@@ -48,6 +48,52 @@ Every row names a test that fails if it breaks. "Scenario row" means a line in [
 | 15 | Unauthorised caregiver | a caregiver or service identity tries to answer, read or change | Refused | — | The request is refused and logged | `watch-consent` S4.1, S9.1; `service` "enforces roles"; `contacts` |
 | 16 | Resident dismisses the Pause | `dismiss` → resolved | Closed | Nobody called | — | `callback` "does not claim a call for the other answers" |
 | 17 | Recovery after a network interruption | the TV or worker loses the hub, then it returns | "Reconnecting…", last state kept, then caught up | — | — | `tv-preview/test/poller.test.ts` ("backs off … and recovers"); ring worker "hub outage is retried on the next poll" |
+
+### Added after the audit of 2026-10-17
+
+| Case | Test |
+|---|---|
+| A repeated answer with or without the offer id does nothing twice; a different answer is refused | `watch-consent` A1, A3 |
+| A replay never says "already on" once the watch ended | `watch-consent` A2 |
+| An unanswered question is deleted, and holds at most ten signs | `watch-consent` B1, B2 |
+| A watch opened by an older version without consent is not honoured | `watch-consent` C1 |
+| Old "Pause was shown" lines are not counted as confirmed | `watch-consent` C2 |
+| Turning scam screening off ends a running watch | `watch-consent` D1 |
+| One weak sign starts no question and is not kept | `watch-consent` E1 |
+| The question is spoken whenever one is open | `watch-consent` F1 |
+| No family-facing view mentions a decline | `watch-consent` G1 |
+| A resident token cannot report "shown"; a repeat report writes nothing | `pause-delivery` S4.2, S4.3 |
+
+### Voice authorization (added 2026-10-17, second round)
+
+| Case | Test |
+|---|---|
+| A resident (voice, Echo or MCP) token saying "turn on" starts nothing, sends nothing and writes nothing | `voice-authorization` V1 |
+| The same question then answered on the authenticated TV starts the watch once | `voice-authorization` V2 |
+| By voice she can still say not now and review privacy | `voice-authorization` V3 |
+| Alexa says aloud, and the card says, where to confirm | `voice-authorization` V5; `scripts/golden-path-check.py` |
+| The TV shows the question as a sheet with "Not now" focused; Back only tucks it away | `tv-preview` render tests; `selectScreen.spec` |
+| The TV says the question aloud once | `narration.spec` |
+
+### Second audit round (2026-10-17)
+
+| Case | Test |
+|---|---|
+| The pending offer's deadline never moves; old labels are gone when it runs out | `watch-consent` R1 |
+| The offer holds at most ten category labels | `watch-consent` R2 |
+| Cleanup is durable on a plain read, and polling does not keep writing | `watch-consent` R3 |
+| "Review privacy" works with no question open and writes nothing | `watch-consent` R4 |
+| Closing a legacy watch or revoking screening deletes the stored signs; old households are migrated once | `watch-consent` R5, R6 |
+| "Turn on" records nothing when the signs can no longer open a watch | `watch-consent` R7 |
+| A spoken turn-on after the TV did says "already on" | `watch-consent` R8 |
+| No offer with door awareness off | `watch-consent` R9 |
+| A closed legacy watch leaves a line for her | `watch-consent` R10 |
+| The question and the answer match what happens (messaged now at high, later at elevated) | `watch-consent` R11 |
+| Family-facing "shown" wording claims only what the TV app reports | `watch-consent` R12 |
+| The privacy text is true (end on TV; privacy time only quiets the Pause; backups) | `watch-consent` R13 |
+| The TV token cannot call MCP tools | `watch-consent` R14 |
+| The TV retries a failed "shown" report | `tv-preview` render test |
+| A reminder containing "turn it on" is a reminder; a long request with "not now" is not a decline | `agents/concierge/tests/test_offline.py` |
 
 ### Honest reading of this table
 

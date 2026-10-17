@@ -38,7 +38,7 @@ export const alertView = z.object({
 export const watchView = z.object({
   state: z.enum(['none', 'offered', 'on', 'declined']),
   untilLabel: z.string().optional(),
-  offer: z.object({ id: z.string(), hours: z.number(), expiresAt: z.string(), notifies: z.string().optional() }).optional(),
+  offer: z.object({ id: z.string(), hours: z.number(), expiresAt: z.string(), notifies: z.string().optional(), tellsNow: z.boolean() }).optional(),
 });
 
 export const watchResult = z.object({
@@ -46,6 +46,7 @@ export const watchResult = z.object({
   riskWindow: safety,
   message: z.string(),
   privacy: z.array(z.string()).optional(),
+  needsTv: z.boolean().optional(),
 });
 
 export const screeningView = z.object({

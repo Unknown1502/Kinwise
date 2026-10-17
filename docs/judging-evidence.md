@@ -29,7 +29,7 @@ The four criteria are equally weighted. The scores below are **our own estimates
 
 | Criterion | Our estimate | Evidence | Biggest weakness | A fix that fits the time |
 |---|---|---|---|---|
-| **Tech implementation** | 8 / 10 | A standards-conformant MCP server with MCP Apps cards and two-tier OAuth (16/16, 22/22 checks); deterministic safety engine (220 hub tests, an evaluation of 17 situations with one disclosed miss, and a resident-consent step the backend enforces); Ring Partner API with real WHEP frames and neutral Nova 2 Lite perception; Vega app running on the simulator; AgentCore Runtime + Memory, Strands, Polly, EventBridge Scheduler, SNS, all CDK, live-tested; an independent four-vendor audit whose findings were fixed ([`security-review.md`](security-review.md)) | The Alexa+ surface and the Ring "person" scene are simulated; SMS and WhatsApp are unproven on real phones | Say plainly on screen what is simulated; show the real e-mail arriving |
+| **Tech implementation** | 8 / 10 | A standards-conformant MCP server with MCP Apps cards and two-tier OAuth (16/16, 22/22 checks); deterministic safety engine (254 hub tests, an evaluation of 17 situations with one disclosed miss, and a resident-consent step the backend enforces); Ring Partner API with real WHEP frames and neutral Nova 2 Lite perception; Vega app running on the simulator; AgentCore Runtime + Memory, Strands, Polly, EventBridge Scheduler, SNS, all CDK, live-tested; an independent four-vendor audit whose findings were fixed ([`security-review.md`](security-review.md)) | The Alexa+ surface and the Ring "person" scene are simulated; SMS and WhatsApp are unproven on real phones | Say plainly on screen what is simulated; show the real e-mail arriving |
 | **Design** | 7.5 / 10 | A resident-controlled safety watch (a plain question with Turn on / Not now / Review privacy, on the Echo card and on the TV); a 10-foot UI with a warm home screen, large Atkinson Hyperlegible text, a calm persimmon Pause that explains *why*, captions, spoken lines, D-pad focus rings, a "nobody answered" state that says so plainly | The video is not made; the Vega footage was captured frame by frame, not with a screen recorder | Record the Vega run with OBS while pressing the same keys |
 | **Potential impact** | 7 / 10 | Real, sourced figures ($7.7 B lost by people 60+ in 2025; 63 million caregivers; Alexa Together no longer offered); a product shape (family-set contacts, consent, access log) that could ship as a Fire TV / Ring app | No user research and no pilot; the AWS stack is single-household demo scale | State the limits; do not claim a market study |
 | **Quality of the idea** | 8.5 / 10 | The cross-device join (earlier call → later visitor → TV Pause → family) is the idea; it matches the rules' own "creative, not obvious" examples: Alexa+ "context-aware add-on that maintains state across sessions" and MCP Apps; Ring "caretaking, event-based triggers"; Fire TV "multi-modal UX combining voice + D-pad + visual"; AWS "Bedrock + AgentCore + Strands" | Courier-scam detection by fixed rules is simple by design | Lead the video with the Pause and the *why* line |
@@ -65,13 +65,15 @@ A flagged call used to open the watch and tell the family automatically (standin
 
 | Check | Result |
 |---|---|
-| `npm test`: kit 15, hub 220 (new: 20 consent, 5 sent-vs-shown), infra 12 | all passed |
-| `tv-preview` 100, `echo-sim` 80 (4 skipped without a hub URL) | all passed |
-| `agents/concierge` 43, `agents/ring-worker` 191 | all passed |
+| `npm test`: kit 15, hub 254, infra 12 | all passed |
+| `tv-preview` 108, `echo-sim` 80 (4 skipped without a hub URL; the 4 live-hub tests also pass with `KINWISE_HUB_URL` set) | all passed |
+| `agents/concierge` 45, `agents/ring-worker` 191; Vega project jest 55 | all passed |
 | `npm run typecheck` (hub, kit, infra, echo-sim, tv-preview) | 0 errors; `tv-app` types are checked only by the Vega build in WSL, **not rerun here** |
 | `npm run conformance -w @kinwise/hub`; `alexa-mcp-conformance` | 22 / 22; 16 / 16 (now 11 tools) |
 | `node scripts/demo-scenario.mjs` and `--decline` | Turn on → Pause; Not now → gentle note only |
 | Real Edge, local stack: ask → question → Review privacy (nothing changes) → Turn on → Pause on the TV → TV reports it shown → Call Meera; Not now → gentle note, nobody told; TV closed → "sent", never "shown" | 15 / 15 |
+
+Independent audits: two deep runs, `aud_0Y5lTT4wcH` (a partial, partly paraphrased diff) and `aud_6tkf0asOM7` (the whole change, condensed, with the tests summarised). Both returned "has serious issues" from all five reviewers. They found real gaps (legacy windows honoured, idempotency without an id, pending labels living past 30 minutes, cleanup not durable, a resident token able to report "shown", wording that said more than the code did, and more); each accepted finding was fixed test-first, and every decision, including three rejected with evidence, is in [`security-review.md`](security-review.md). Neither audit certifies the change, and the fixes after the second were not re-audited.
 
 Not done: the **hosted** stack still runs the previous behaviour until it is redeployed (needs your say-so: `cd infra && npx cdk deploy --require-approval never`); the Vega Virtual Device build and the demo video predate this change (blocker 8).
 

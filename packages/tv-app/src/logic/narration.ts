@@ -19,6 +19,12 @@ export function narration(prev: TvStateView | undefined, next: TvStateView): str
   const fresh = next.today.messages.filter((m) => m.unread && !known.has(m.id)).slice(0, 2);
   for (const m of fresh.reverse()) lines.push(`New message from ${m.from}: ${m.text}`);
 
+  const offer = next.watch?.state === 'offered' ? next.watch.offer : undefined;
+  if (offer && !(prev.watch?.state === 'offered' && prev.watch.offer?.id === offer.id)) {
+    const tell = offer.notifies ? (offer.tellsNow ? `, and send ${offer.notifies} a short message right away` : `, and tell ${offer.notifies} if it looks serious`) : '';
+    lines.push(`Kinwise has a question. Would you like a ${offer.hours}-hour safety watch for your front door${tell}? Nothing starts unless you choose Turn on. You can choose Not now.`);
+  }
+
   const was = prev.today.privacyHourUntilLabel;
   const now = next.today.privacyHourUntilLabel;
   if (now && now !== was) lines.push(`Privacy time is on until ${now}. Kinwise won't notice the door until then.`);

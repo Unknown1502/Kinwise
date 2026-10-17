@@ -25,7 +25,7 @@ function setup(start = local('10:00')) {
 }
 
 /** Asha's explicit answer to "turn on a safety watch?" after a flagged call or reminder. */
-const turnOn = (service: KinwiseService, v: { watch: { offer?: { id: string } } }) => service.respondToWatch(asha, v.watch.offer!.id, 'turn_on');
+const turnOn = (service: KinwiseService, v: { watch: { offer?: { id: string } } }) => service.respondToWatch(tv, v.watch.offer!.id, 'turn_on');
 
 const visitor = (id: string, hhmm: string, personPresent = true): VisitorEvent => ({
   eventId: id,
@@ -63,7 +63,7 @@ describe('KinwiseService — hero story', () => {
     expect(v.signs.map((s) => s.key)).toEqual(['authority', 'urgency', 'secrecy', 'unusual_payment', 'courier_pickup']);
     expect(v.advice[0]).toMatch(/Don't hand anything/);
     expect(notifier.outbox).toEqual([]);
-    await service.respondToWatch(asha, v.watch.offer!.id, 'turn_on'); // her explicit choice
+    await service.respondToWatch(tv, v.watch.offer!.id, 'turn_on'); // her explicit choice
     expect(notifier.outbox.map((x) => x.kind)).toEqual(['risk_high']);
 
     // 14:41 an unexpected visitor
