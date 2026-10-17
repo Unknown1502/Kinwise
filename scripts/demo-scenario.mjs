@@ -55,7 +55,13 @@ const steps = [
     : [
         [
           '10:22 — Asha presses Turn on on her TV (the only place that can start the watch)',
-          async () => console.log('   📺', JSON.stringify((await post('/tv/watch', { choice: 'turn_on' }, TV)).message)),
+          async () => {
+            // The TV names the question it is answering, exactly as its on-screen sheet does.
+            const state = await (await fetch(`${HUB}/tv/state`, { headers: { authorization: `Bearer ${TV}` } })).json();
+            const offerId = state.watch?.offer?.id;
+            if (!offerId) throw new Error('No safety-watch question is open on the TV');
+            console.log('   📺', JSON.stringify((await post('/tv/watch', { choice: 'turn_on', offerId }, TV)).message));
+          },
         ],
       ]),
   [

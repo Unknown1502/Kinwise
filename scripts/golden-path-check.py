@@ -141,7 +141,8 @@ async def main():
         echo = await ctx.new_page()
         await echo.goto(ECHO)
         await ask(echo, CALL)
-        api("POST", "/tv/watch", "dev-tv", {"choice": "turn_on"})  # answered on the TV, then the TV app is closed before the doorbell
+        offer_id = api("GET", "/tv/state")["watch"]["offer"]["id"]
+        api("POST", "/tv/watch", "dev-tv", {"choice": "turn_on", "offerId": offer_id})  # answered on the TV (naming the question), then the TV app is closed before the doorbell
         await echo.get_by_role("button", name="Ring the doorbell").click()
         await echo.wait_for_timeout(3000)
         st = api("GET", "/tv/state")

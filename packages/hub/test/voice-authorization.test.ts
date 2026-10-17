@@ -60,7 +60,7 @@ describe('only the authenticated TV can start the watch; a voice cannot be verif
     const { watch } = await service.checkCall(asha, { description: CALL });
     const review = await service.respondToWatch(asha, watch.offer!.id, 'review_privacy');
     expect(review.privacy!.join(' ')).toMatch(/press Turn on on your TV/); // it also says where the real choice is made
-    expect(review.privacy!.join(' ')).toMatch(/at most 30 minutes, then deletes them/); // the pending labels are disclosed, not hidden
+    expect(review.privacy!.join(' ')).toMatch(/at most 30 minutes, and it deletes them the next time Kinwise runs/); // the pending labels are disclosed, not hidden
     expect(review.watch.state).toBe('offered');
     const no = await service.respondToWatch(asha, watch.offer!.id, 'not_now');
     expect(no.watch.state).toBe('declined');

@@ -87,3 +87,29 @@ Five reviewers (OpenAI x2, Google, Anthropic, DeepSeek). This time the input was
 Not a finding, checked: an "eval hides family pings for by-design rows" claim is wrong, because `scenarios.test` "never pings the family for a watch Asha declined, ended or never answered" asserts each such row separately.
 
 Neither audit certifies this change. Both were single-panel reviews of a condensed view.
+
+## Third audit: the bounded release check (2026-10-17, run `aud_1EOSt8PKHq`, deep)
+
+The input this time was **verbatim**: real diffs from the pre-consent base for the hub service, views, routes, MCP server, types, the card and the Vega app code; the three new test files in full; the authorization and domain files they depend on; and the privacy contract as committed. Left out (and said so): the evaluation runner, schemas, timeline card, TV api/narration/today/type diffs, the concierge, scripts, infrastructure and all other documents. The two excerpts of unchanged auth and scope code were condensed. One reviewer (Google) found nothing; the others returned 6, 5, 11 and 6 findings (about 18 distinct, none of them new categories of flaw). The questions were limited to consent enforcement, retention and deletion, sent-versus-shown, the revocation race and the privacy contract.
+
+| # | Finding (reviewers) | Decision | Why |
+|---|---|---|---|
+| 1 | A TV retry that names no question can be applied to a newer one (2, blocking) | **Accepted** | The TV must name the question for Turn on; a stale retry is refused (`watch-consent` T1) |
+| 2 | The question says "if it looks serious" while turning on messages family at once, because it ignores signs left by a recently ended watch (3) | **Accepted** | The disclosure counts the same signs that turning on uses (T2) |
+| 3 | A window closed by revocation or legacy cleanup keeps its category labels (3) | **Accepted** | Those windows are now closed without categories (T3) |
+| 4 | Turning door alerts off leaves an open question or a running watch, and Turn on is not refused (2) | **Accepted** | Door-off withdraws the question, ends the watch and refuses Turn on (T4) |
+| 5 | The text says labels are deleted after 30 minutes, but deletion happens on the next read, and "on answer" is untrue for Turn on (4, two blocking) | **Accepted as wording** | Privacy text, README and spec now say exactly that, including what Turn on keeps (T7). A scheduled sweep was not built: it would add a timer and a new permission for little gain |
+| 6 | The decline text lists one fact; three remain (1, blocking) | **Accepted** | The spoken text now lists all three (T7) |
+| 7 | The revocation race is not disclosed (4, three blocking) | **Accepted as disclosure** | Stated in the spec and README, with its bound; not eliminated; no outbox built |
+| 8 | "I've told Meera" is said when delivery failed (1) | **Accepted** | Only said when a channel accepted the message (T6) |
+| 9 | "Shown" is reported when the app renders; foreground is not checked (2) | **Documented limit, wording tightened** | Family-facing texts say "reported on screen by the TV app"; the README no longer claims a platform fact it cannot source. A button pressed on the TV's own Pause also counts (T5) |
+| 10 | If the report fails and she answers first, the family hears "may not have been seen" beside her answer (1) | **Accepted** | Answering on the TV marks it reported (T5) |
+| 11 | A resident-role Turn on is not literally write-free: reads do housekeeping (1, blocking) | **Accepted as wording** | The contract says it answers nothing and sends nothing; housekeeping writes are allowed and stated |
+| 12 | The README promises a family signal for every Turn on (2) | **Accepted** | Qualified: at once if serious, otherwise only if it later is |
+| 13 | A voice "not now" is accepted from an unverified speaker (1) | **Documented trade-off** | Stated in the spec, with the reason |
+| 14 | Signs from a watch she turned on earlier stay after a later "Not now" or after she ends that watch (3) | **Accepted as disclosure** | They are consented data with their own retention (up to 24 hours of accumulation plus timeline lines); the spec says so. Revocation clears them |
+| 15 | Concurrent duplicate "shown" reports can write one extra version (1) | **Rejected** | One harmless extra version; no privacy or integrity effect |
+| 16 | Tests are weak: the TV-token test passes on any failure; a title is wrong; no test for the no-read case (1) | **Accepted** | `T8` asserts the 403 `insufficient_scope`; the title is fixed; the no-read case is disclosed rather than tested |
+| 17 | The cap is described as "ten signs" in one place and "ten labels" in another (1) | **Accepted** | Wording fixed; labels never exceed ten because a record has at most six categories |
+
+This audit's fixes were **not independently reviewed**. They were checked by their tests and by reading the diff. Under the release plan this closes the review cycle: a further audit needs new evidence of a material defect.

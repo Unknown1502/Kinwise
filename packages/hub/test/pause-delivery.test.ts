@@ -79,7 +79,7 @@ describe('a Pause that was sent is not a Pause that was shown', () => {
     expect((await service.explainLastAlert(priya)).summary).toMatch(/TV app reported that the Pause was on screen/i);
   });
 
-  it('S4.1: only her TV or she can confirm; an unknown alert is refused', async () => {
+  it('S4.1: a caregiver cannot confirm; an unknown alert is refused', async () => {
     await expect(service.markAlertShown(priya, alertId)).rejects.toBeInstanceOf(PermissionError);
     await expect(service.markAlertShown(tv, 'alert_nope')).rejects.toBeInstanceOf(NotFoundError);
   });

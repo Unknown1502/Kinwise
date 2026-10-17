@@ -308,7 +308,7 @@ export function buildMcpServer(identity: Identity, service: KinwiseService): Mcp
       const text =
         v.entries.length === 0
           ? `A quiet day so far for ${v.residentName}.`
-          : `${v.residentName}'s day: ${s.expectedVisitors} expected visitors, ${s.unexpectedVisitors} unexpected, ${s.pausesSent} Pause${s.pausesSent === 1 ? '' : 's'} sent (${s.pausesShown} confirmed on the TV). Latest: ${v.entries.at(-1)?.text}`;
+          : `${v.residentName}'s day: ${s.expectedVisitors} expected visitors, ${s.unexpectedVisitors} unexpected, ${s.pausesSent} Pause${s.pausesSent === 1 ? '' : 's'} sent (${s.pausesShown} reported on screen by the TV app). Latest: ${v.entries.at(-1)?.text}`;
       return ok(text, v);
     }),
   );

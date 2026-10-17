@@ -321,11 +321,12 @@ describe('audit follow-ups: retries, legacy state, expiry, revocation', () => {
     await ctx.service.createHousehold(demoHousehold(ctx.clock.now()));
   });
 
-  it('A1: a retried answer WITHOUT an offer id does the same thing once, and does not error', async () => {
+  it('A1: a retried answer does the same thing once; a retried "not now" without an id does not error either', async () => {
     const { service, notifier } = ctx;
     await service.checkCall(asha, { description: CALL });
-    const first = await service.respondToWatch(tv, undefined, 'turn_on');
-    const again = await service.respondToWatch(tv, undefined, 'turn_on');
+    const offerId = (await service.tvState(tv)).watch.offer!.id;
+    const first = await service.respondToWatch(tv, offerId, 'turn_on');
+    const again = await service.respondToWatch(tv, offerId, 'turn_on');
     expect(first.watch.state).toBe('on');
     expect(again.watch.state).toBe('on');
     expect(again.message).toMatch(/already on/i);
@@ -626,6 +627,150 @@ describe('audit round 2: the TV credential', () => {
       .then((r) => ({ ok: !(r as { isError?: boolean }).isError }))
       .catch(() => ({ ok: false }));
     expect(outcome.ok).toBe(false);
+  });
+});
+
+// ─── findings from the third independent audit aud_1EOSt8PKHq, 2026-10-17 ───
+
+describe('audit round 3: stale retries, closed-watch data, door awareness, honest delivery', () => {
+  let ctx: ReturnType<typeof setup>;
+  beforeEach(async () => {
+    ctx = setup();
+    await ctx.service.createHousehold(demoHousehold(ctx.clock.now()));
+  });
+
+  it('T1: the TV cannot turn a watch on without naming the question; and a stale retry never answers a newer question', async () => {
+    const { service, clock, store, notifier } = ctx;
+    const o1 = await service.checkCall(asha, { description: CALL });
+    await expect(service.respondToWatch(tv, undefined, 'turn_on')).rejects.toBeInstanceOf(ValidationError);
+    await service.respondToWatch(tv, o1.watch.offer!.id, 'turn_on');
+    await service.closeRiskWindow(tv, 'Resident ended the safety watch');
+
+    clock.t = local('10:40');
+    const o2 = await service.checkCall(asha, { description: CALL });
+    expect(o2.watch.offer!.id).not.toBe(o1.watch.offer!.id);
+    notifier.outbox.length = 0;
+
+    await service.respondToWatch(tv, o1.watch.offer!.id, 'turn_on').catch(() => undefined); // a delayed retry of the first answer: refused or ignored, never applied to the second question
+    expect((await store.load(HH))!.watchOffer?.id).toBe(o2.watch.offer!.id); // the second question is still waiting
+    expect((await service.tvState(tv)).watch.state).toBe('offered');
+    expect(notifier.outbox).toEqual([]);
+  });
+
+  it('T2: the question says "right away" whenever turning it on will message family, counting signs left by a recently ended watch', async () => {
+    const { service, clock, store, notifier } = ctx;
+    const s = (await store.load(HH))!;
+    s.signals = [{ at: local('10:00').toISOString(), source: 'check', categories: ['authority', 'urgency', 'courier_pickup'], level: 'high' }];
+    await store.save(s, s.version);
+
+    clock.t = local('10:20');
+    const q = await service.addReminder(asha, { text: 'Courier from the bank picking up a package', at: local('14:00').toISOString() }); // elevated on its own
+    expect(q.watch.offer).toMatchObject({ notifies: 'Meera', tellsNow: true });
+    const on = await service.respondToWatch(tv, q.watch.offer!.id, 'turn_on');
+    expect(on.message).toMatch(/I've told Meera/);
+    expect(notifier.outbox.map((n) => n.kind)).toEqual(['risk_high']);
+  });
+
+  it('T3: revoking scam screening, or closing a legacy watch, also removes the categories the closed window kept', async () => {
+    const { service, store } = ctx;
+    const s = (await store.load(HH))!;
+    s.riskWindow = { id: 'win_legacy', openedAt: local('10:00').toISOString(), expiresAt: local('16:00').toISOString(), level: 'high', categories: ['authority', 'urgency'] };
+    await store.save(s, s.version);
+    await service.tvState(tv);
+    expect((await store.load(HH))!.riskWindow?.categories).toEqual([]);
+
+    const a = await service.checkCall(asha, { description: CALL });
+    await service.respondToWatch(tv, a.watch.offer!.id, 'turn_on');
+    expect((await store.load(HH))!.riskWindow?.categories.length).toBeGreaterThan(0);
+    await service.updateConsent(asha, { scamScreening: false });
+    const raw = (await store.load(HH))!;
+    expect(raw.riskWindow?.closedAt).toBeDefined();
+    expect(raw.riskWindow?.categories).toEqual([]);
+    expect(raw.signals).toEqual([]);
+  });
+
+  it('T4: turning door alerts off withdraws an open question and ends a running watch; and "turn on" is refused while they are off', async () => {
+    const one = ctx;
+    const q = await one.service.checkCall(asha, { description: CALL });
+    await one.service.updateConsent(asha, { doorAwareness: false });
+    expect((await one.store.load(HH))!.watchOffer).toBeUndefined();
+    await expect(one.service.respondToWatch(tv, q.watch.offer!.id, 'turn_on')).rejects.toBeInstanceOf(ValidationError);
+
+    const two = setup();
+    await two.service.createHousehold(demoHousehold(two.clock.now()));
+    const a = await two.service.checkCall(asha, { description: CALL });
+    await two.service.respondToWatch(tv, a.watch.offer!.id, 'turn_on');
+    two.notifier.outbox.length = 0;
+    await two.service.updateConsent(asha, { doorAwareness: false });
+    expect((await two.service.tvState(tv)).today.safety.level).toBe('none');
+    const raw = (await two.store.load(HH))!;
+    expect(raw.riskWindow?.categories).toEqual([]);
+    expect(raw.signals).toEqual([]);
+    expect(two.notifier.outbox).toEqual([]);
+
+    const three = setup();
+    await three.service.createHousehold(demoHousehold(three.clock.now()));
+    const b = await three.service.checkCall(asha, { description: CALL });
+    const s = (await three.store.load(HH))!;
+    s.consent.doorAwareness = false; // stored state where door alerts are off while a question is open
+    await three.store.save(s, s.version);
+    const r = await three.service.respondToWatch(tv, b.watch.offer!.id, 'turn_on');
+    expect(r.message).toMatch(/door alerts are off/i);
+    expect((await three.store.load(HH))!.riskWindow).toBeUndefined();
+    expect(three.notifier.outbox).toEqual([]);
+  });
+
+  it('T5: when she answers a Pause on the TV, that proves it was on screen; answering from the Echo does not', async () => {
+    const { service, clock } = ctx;
+    const a = await service.checkCall(asha, { description: CALL });
+    await service.respondToWatch(tv, a.watch.offer!.id, 'turn_on');
+    clock.t = local('14:41');
+    const id1 = (await service.ingestVisitor(HH, visitor('t5a', '14:41'))).alertId!;
+    await service.respondToAlert(tv, id1, 'dismiss');
+    const ex = await service.explainLastAlert(priya);
+    expect(ex.summary).toMatch(/TV app reported that the Pause was on screen/);
+    expect(ex.summary).not.toMatch(/may not have been seen/);
+
+    clock.t = local('15:10');
+    const id2 = (await service.ingestVisitor(HH, visitor('t5b', '15:10'))).alertId!;
+    await service.respondToAlert(asha, id2, 'dismiss');
+    expect((await service.explainLastAlert(priya)).summary).not.toMatch(/TV app reported that the Pause was on screen/);
+  });
+
+  it('T6: if family could not be reached, she is not told "I\'ve told Meera"', async () => {
+    const clock = { t: local('10:20'), now() { return this.t; } };
+    const failing = { notify: async () => false } as unknown as OutboxNotifier;
+    const service = new KinwiseService({ store: new MemoryStore(), notifier: failing, clock });
+    await service.createHousehold(demoHousehold(clock.now()));
+    const q = await service.checkCall(asha, { description: CALL });
+    const on = await service.respondToWatch(tv, q.watch.offer!.id, 'turn_on');
+    expect(on.watch.state).toBe('on'); // the watch itself is on
+    expect(on.message).not.toMatch(/I've told Meera/);
+    expect(on.message).toMatch(/could not confirm/i);
+    expect(on.message).toMatch(/call Meera yourself/i);
+  });
+
+  it('T7: the spoken privacy review says what is true about deletion timing, what turn on keeps, and what not now keeps', async () => {
+    const { service } = ctx;
+    const text = (await service.respondToWatch(asha, undefined, 'review_privacy')).privacy!.join(' ');
+    expect(text).toMatch(/next time Kinwise/i); // deletion happens on the next read, not on a timer
+    expect(text).toMatch(/turn it on, those kinds become part of the watch/i);
+    expect(text).toMatch(/not now.*note.*won't ask again for an hour/i);
+    expect(text).not.toMatch(/then deletes them\./); // the old unqualified promise
+  });
+
+  it('T8: the TV token is refused on the MCP endpoint with 403 insufficient_scope (not just "something failed")', async () => {
+    const fixed = new Date('2026-10-07T10:00:00-04:00');
+    const { app } = await bootstrap(loadConfig({ AUTH_MODE: 'dev', STORE: 'memory', CONCIERGE_URL: '' } as NodeJS.ProcessEnv), { clock: { now: () => fixed } });
+    const res = await app.fetch(
+      new Request('http://kinwise.test/mcp', {
+        method: 'POST',
+        headers: { authorization: 'Bearer dev-tv', 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-11-25' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'kinwise_set_safety_watch', arguments: { choice: 'not_now' } } }),
+      }),
+    );
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: string }).error).toBe('insufficient_scope');
   });
 });
 

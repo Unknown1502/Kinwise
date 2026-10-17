@@ -95,6 +95,19 @@ Every row names a test that fails if it breaks. "Scenario row" means a line in [
 | The TV retries a failed "shown" report | `tv-preview` render test |
 | A reminder containing "turn it on" is a reminder; a long request with "not now" is not a decline | `agents/concierge/tests/test_offline.py` |
 
+### Third audit round (2026-10-17)
+
+| Case | Test |
+|---|---|
+| The TV cannot turn a watch on without naming the question; a stale retry never answers a newer one | `watch-consent` T1 |
+| The question's "right away" disclosure counts every sign that turning on will use | `watch-consent` T2 |
+| Revocation and legacy closure also remove the closed window's categories | `watch-consent` T3 |
+| Turning door alerts off withdraws the question, ends the watch and refuses Turn on | `watch-consent` T4 |
+| Answering a Pause on the TV counts as the TV reporting it; answering from the Echo does not | `watch-consent` T5 |
+| She is not told "I've told Meera" when family could not be reached | `watch-consent` T6 |
+| The spoken privacy review is true about deletion timing, what Turn on keeps and what Not now keeps | `watch-consent` T7 |
+| The TV token gets 403 `insufficient_scope` on the MCP endpoint | `watch-consent` T8 |
+
 ### Honest reading of this table
 
 - Unit and integration tests prove the rules do what this page says. The scenario suite is 17 scripted situations on one synthetic household; it does not measure how often real scams or real doorbells behave this way, and it says nothing about real-world effectiveness.

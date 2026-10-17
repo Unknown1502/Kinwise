@@ -22,7 +22,7 @@ mountCard('timeline', (d: TimelineData) => {
       stat(d.summary.expectedVisitors, 'expected visitors'),
       stat(d.summary.unexpectedVisitors, 'unexpected'),
       stat(d.summary.pausesSent, 'Pauses sent'),
-      stat(d.summary.pausesShown, 'confirmed on the TV'),
+      stat(d.summary.pausesShown, 'reported on screen'),
       stat(d.summary.flaggedCalls, 'calls checked'),
     ),
   );

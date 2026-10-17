@@ -30,7 +30,7 @@ Courier scams have two steps: a caller posing as a bank or the FTC frightens an 
 - **Ring**: the official **Ring Partner API** and Developer Playground (devices, history, WHEP live view, signed webhooks). Frames stay in memory; Nova 2 Lite describes presence neutrally, never identity.
 - **Fire TV**: a **React Native for Vega OS** app (D-pad first, VoiceView, captions, an accessible typeface), run on the **Vega Virtual Device** and in a browser preview from the same source.
 - **AWS** (all CDK): Lambda (ARM64) + API Gateway, Cognito, DynamoDB, Secrets Manager, SNS, EventBridge Scheduler, Polly (the TV's voice), X-Ray, **Bedrock AgentCore Runtime + Memory**, **Strands Agents** and **Amazon Nova 2 Lite**.
-- **The model never makes a safety decision.** The warning signs, the warning window and the door decision are deterministic rules with named constants and 254 hub tests; the model only talks kindly and describes a camera scene neutrally.
+- **The model never makes a safety decision.** The warning signs, the warning window and the door decision are deterministic rules with named constants and 262 hub tests; the model only talks kindly and describes a camera scene neutrally.
 - **Open source**: `alexa-plus-mcp-kit` (Apache-2.0), a library and `alexa-mcp-conformance` CLI that checks any MCP server against the Alexa+ add-on contract.
 
 ## Challenges
