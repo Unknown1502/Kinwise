@@ -1,6 +1,6 @@
 # Submission checklist (Amazon AppDev 2026, deadline Oct 23, 12:00 PM PT)
 
-> Start with [`judging-evidence.md`](judging-evidence.md): the requirements read from the official rules on 2026-10-16, the blockers in order, and the readiness verdict. Then [`devpost-draft.md`](devpost-draft.md) (text, product feedback, open-source fields), [`demo-storyboard.md`](demo-storyboard.md) (the 2:40 plan) and [`safety-test-coverage.md`](safety-test-coverage.md).
+> The final field-by-field list (what to paste where, and what only the account owner can do) is kept with the video files as `DEVPOST-CHECKLIST.md`. Start with [`judging-evidence.md`](judging-evidence.md): the requirements read from the official rules on 2026-10-16, the blockers in order, and the readiness verdict. Then [`devpost-draft.md`](devpost-draft.md) (text, product feedback, open-source fields), [`demo-storyboard.md`](demo-storyboard.md) (the 2:40 plan) and [`safety-test-coverage.md`](safety-test-coverage.md).
 
 Every rule requirement, the evidence in this repo, and its status. ✅ done · 🔄 in progress · ⬜ to do (team)
 
@@ -10,7 +10,7 @@ Every rule requirement, the evidence in this repo, and its status. ✅ done · �
 | New project built during the hackathon window | Git history starts 2026-10-05 | ✅ |
 | Public GitHub repo with an OSS license, source and run instructions | github.com/Unknown1502/Kinwise (Apache-2.0); README "Run it locally"; `scripts/setup.mjs` + `scripts/dev.mjs` | ✅ |
 | A judge can run it locally without our accounts | `node scripts/dev.mjs --offline` (dev tokens, offline concierge); verified on a fresh clone | ✅ |
-| No secrets in the repo | History scanned (tokens, AWS keys, account id, phone, email); `.gitignore` covers tokens, captures, `.env`, CDK outputs | ✅ |
+| No secrets in the repo | Tracked files and history scanned 2026-10-18 (demo tokens, AWS keys, bearer values, private keys, ARNs, account number): none. `.gitignore` covers tokens, captures, `.env`, CDK outputs. **One personal e-mail address (the demo caregiver's) is in `docs/judging-evidence.md` and in earlier history**; it was published before this check and cannot be removed without rewriting published history. | ✅ with that exception |
 
 ## Track checks (each selected track is a pass/fail "uses the required tech")
 | Track | Requirement | Evidence | Status |
@@ -40,7 +40,7 @@ Every rule requirement, the evidence in this repo, and its status. ✅ done · �
 | Devpost text (inspiration, what it does, how we built it, challenges, accomplishments, learnings, what's next) | Written by the team in their own words | ⬜ |
 | Product Feedback for every tool used | Source notes: `docs/product-feedback-notes.md` (Alexa+, Ring, Fire TV/Vega, AWS) | ⬜ |
 | Independent security review | A four-vendor multi-model audit of the contacts, SMS and follow-up code; its findings were checked and fixed or rejected with reasons (one was a real IAM bug) | `docs/security-review.md` | ✅ (reviewers saw a description of the code, not the source; earlier changes were self-reviewed with tests only) |
-| Friction Log (up to +10%) | `docs/friction-log.md`, 17 first-hand entries | ✅ (attach/link) |
+| Friction Log (up to +10%) | `docs/friction-log.md`, 18 first-hand entries | ✅ (attach/link) |
 | Testing instructions for judges | Hosted endpoints + demo tokens (`node scripts/demo-tokens.mjs`) go in the private testing field, never the repo. Tell judges: the Pause needs a prior "is this call real?" question (or a saved reminder that sounds like a scam) to be a Pause rather than a gentle note. The demo doorbell always rings as a stranger, at any hour (a real Ring event still honours the expected-visit schedule) | ⬜ |
 | Select tracks: Fire TV, Alexa+, Ring + both mini-challenges | Devpost form | ⬜ |
 | Submit a draft early (Oct 22), final by Oct 23 9:00 AM PT | Devpost | ⬜ |
