@@ -10,7 +10,7 @@ Every rule requirement, the evidence in this repo, and its status. ✅ done · �
 | New project built during the hackathon window | Git history starts 2026-10-05 | ✅ |
 | Public GitHub repo with an OSS license, source and run instructions | github.com/Unknown1502/Kinwise (Apache-2.0); README "Run it locally"; `scripts/setup.mjs` + `scripts/dev.mjs` | ✅ |
 | A judge can run it locally without our accounts | `node scripts/dev.mjs --offline` (dev tokens, offline concierge); verified on a fresh clone | ✅ |
-| No secrets in the repo | Tracked files and history scanned 2026-10-18 (demo tokens, AWS keys, bearer values, private keys, ARNs, account number): none. `.gitignore` covers tokens, captures, `.env`, CDK outputs. **One personal e-mail address (the demo caregiver's) is in `docs/judging-evidence.md` and in earlier history**; it was published before this check and cannot be removed without rewriting published history. | ✅ with that exception |
+| No secrets in the repo | Tracked files and history scanned 2026-10-18 (demo tokens, AWS keys, bearer values, private keys, ARNs, account number): none. `.gitignore` covers tokens, captures, `.env`, CDK outputs. One personal e-mail address (the demo caregiver's) was in `docs/judging-evidence.md`; it is removed from the current files, but it remains in earlier published history, which cannot be cleaned without rewriting it (GitHub Support has a sensitive-data removal process for that). | ✅ with that exception |
 
 ## Track checks (each selected track is a pass/fail "uses the required tech")
 | Track | Requirement | Evidence | Status |
