@@ -1,10 +1,10 @@
 # Kinwise
 
-**A consent-first family safety net that stops a courier scam in the gap between the phone call and the front door, using Alexa+, Ring and Fire TV.**
+**A consent-first family safety net that links a scam-call warning to the visitor at the door and pauses Asha before she opens it, using Alexa+, Ring and Fire TV.**
 
 Built for the [Amazon AppDev 2026 hackathon](https://amazonappdev2026.devpost.com/) · tracks: **Fire TV**, **Alexa+**, **Ring** · mini-challenges: **AWS Builder**, **Open Source**
 
-> 🎬 Demo video: _add link_ · 📝 Devpost: _add link_
+> 🎬 Demo video (2:49): [youtu.be/9CkonL1DmqE](https://youtu.be/9CkonL1DmqE)
 
 ---
 
@@ -12,7 +12,7 @@ Built for the [Amazon AppDev 2026 hackathon](https://amazonappdev2026.devpost.co
 
 Courier scams have two steps. First a caller posing as a bank, the FTC or the police convinces an older adult that their money is in danger. Then a "courier" comes **to the home** to collect cash or gold.
 
-- Americans aged 60 and over reported **$7.7 billion** in fraud losses in 2025, about 60% more than in 2024, out of **$20.9 billion** reported by all ages ([AARP's report on the FBI's 2025 IC3 data, April 16, 2026](https://www.aarp.org/money/scams-fraud/fbi-ftc-report-2025-losses/)).
+- Americans aged 60 and over reported **$7.7 billion** in losses to internet crime in 2025, about 60% more than in 2024, out of **$20.9 billion** reported by all ages ([AARP's report on the FBI's 2025 IC3 data, April 16, 2026](https://www.aarp.org/money/scams-fraud/fbi-ftc-report-2025-losses/)).
 - FBI Boston documented **103 courier pickups of cash or gold bars between 2023 and May 2025, with losses of $26,024,691**; roughly **98% of those losses were reported by people over 60**. Nationwide the FBI documented at least 1,737 such pickups and about $186 million in losses ([FBI Boston release, September 2025](https://www.fbi.gov/contact-us/field-offices/boston/news/fbi-boston-warns-of-increase-in-gold-bar-and-bulk-cash-courier-scams); figures as reproduced by [the Charlestown Bridge](https://charlestownbridge.com/2025/09/24/fbi-boston-warns-of-increase-in-gold-bar-and-bulk-cash-courier-scams/)). Note that 98% is a share of the *losses*, not of the victims.
 - **63 million** Americans provided ongoing care to an adult or child with special needs ([AARP, Caregiving in the U.S. 2025](https://www.aarp.org/press/releases/2025-07-24-new-report-reveals-crisis-point-for-americas-63-million-family-caregivers.html)). Amazon's own Alexa Together page now says the service is no longer offered (update dated May 21, 2025) and points to Alexa Emergency Assist ([Amazon](https://www.aboutamazon.com/md/news/devices/alexa-together-launches-to-help-customers-remotely-care-for-loved-ones)).
 
