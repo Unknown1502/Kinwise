@@ -47,29 +47,63 @@ On ordinary days the TV is Asha's calm home screen: expected visitors (the garde
 ## Architecture
 
 ```mermaid
-flowchart LR
-  subgraph Home
-    Echo["Echo Show sim<br/>(MCP client + MCP Apps host)"]
-    TV["Fire TV app<br/>(React Native for Vega)"]
-    Ring["Ring doorbell / Playground"]
+flowchart TB
+  subgraph Home["Asha's home"]
+    Echo["Echo Show simulator<br/>SIMULATED Alexa+ surface<br/>real MCP client + MCP Apps host"]
+    TV["Fire TV app<br/>React Native for Vega<br/>runs on the Vega Virtual Device"]
+    Ring["Ring doorbell /<br/>Developer Playground"]
   end
-  subgraph AWS
-    Hub["Kinwise hub on Lambda<br/>rules engine · MCP server · TV API"]
+  Worker["Ring worker<br/>Partner API, WHEP, signed events"]
+  Hub["Kinwise hub on AWS Lambda<br/>deterministic safety rules, MCP server, TV API"]
+  subgraph AWS["AWS services, us-east-1"]
     Concierge["Concierge on AgentCore Runtime<br/>Strands + Nova 2 Lite + Memory"]
-    DDB[(DynamoDB)]
-    SNS[[SNS → family]]
-    Cog[Cognito<br/>two-tier OAuth]
+    DDB[("DynamoDB<br/>household state")]
+    Sched["EventBridge Scheduler<br/>2-minute follow-up"]
+    Cog["Cognito<br/>two-tier OAuth"]
+    SNS["SNS e-mail"]
   end
-  Worker["Ring worker<br/>Partner API · WHEP · webhooks · Nova vision"]
-  Echo -- "/sim/ask" --> Hub
-  Hub -- "InvokeAgentRuntime" --> Concierge
-  Concierge -- "MCP (user's token)" --> Hub
-  Echo -- "MCP resources/read + tools/call" --> Hub
-  TV -- "/tv/state (poll)" --> Hub
+  Meera["Meera, the family caregiver"]
+  Echo -- "ask, set_safety_watch. turn_on only returns needsTv" --> Hub
+  TV <== "question and Pause go down. turn_on and 'shown' come up, TV token only" ==> Hub
   Ring --> Worker -- "HMAC-signed visitor event" --> Hub
+  Hub <--> Concierge
   Hub --- DDB
-  Hub --> SNS
-  Cog -. tokens .- Hub
+  Hub --> Sched
+  Cog -.- Hub
+  Hub --> SNS --> Meera
+  classDef sim fill:#fff3cd,stroke:#b8860b,color:#000;
+  class Echo sim
+```
+
+Yellow is simulated. The Alexa+ surface is a labelled simulation, and the door event in the demo is a labelled doorbell simulator or a signed event (the Ring Developer Playground has no person scene). The thick line is the consent boundary: only the authenticated Fire TV can turn the watch on.
+
+### How a warning becomes a Pause
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant A as Asha
+  participant E as Echo (simulated Alexa+)
+  participant H as Kinwise hub
+  participant T as Fire TV app (Vega)
+  participant R as Ring doorbell (Playground)
+  participant M as Meera (family)
+  A->>E: "Is this call real?"
+  E->>H: kinwise_check_call
+  H-->>E: warning signs (categories only) and a question, nothing started
+  H-->>T: "Would you like a 6-hour safety watch?" (Not now is focused)
+  A->>E: "Yes, turn it on"
+  E->>H: set_safety_watch turn_on
+  H-->>E: needsTv, nothing starts and nobody is told
+  A->>T: presses Turn on
+  T->>H: POST /tv/watch (TV token, offerId)
+  H-->>M: short signal once the signs add up to serious (no words, no recordings)
+  R->>H: visitor event (signed)
+  H-->>T: Pause, recorded as "sent"
+  T->>H: shown report (the app drew the screen)
+  Note over H: shown = the TV app reported it,<br/>not that Asha looked.<br/>No report in 60 s = not confirmed
+  A->>T: presses Call Meera
+  H-->>M: e-mail with the "I'm calling now" button
 ```
 
 Full design: [`docs/spec.md`](docs/spec.md).
