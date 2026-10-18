@@ -6,6 +6,10 @@
 
 **Kinwise** — a consent-first family safety net that links a suspicious phone call to the visitor at the front door, with Alexa+, Ring and Fire TV.
 
+## Demo video
+
+**Link: [paste the public YouTube or Vimeo URL here after you upload it, then open it in a private window to confirm it plays without signing in].** The edit is `D:\kinwise-demoinal3\kinwise-demo.mp4` (2:42, English narration with captions in `kinwise-demo-captions.srt`). It is recorded from the deployed version (commit `22ab5c2`). It labels what is simulated: the Alexa+ surface (an Echo Show web app), the doorbell event (the labelled simulator, because the Ring Developer Playground has no person scene), and Meera's phone panel; the Vega app is the real app on the Vega Virtual Device, and the Ring clip is the real Ring Partner API.
+
 ## Elevator pitch (about 200 characters)
 
 Courier scams need two steps: a scary call, then someone at the door. Kinwise connects them. When a stranger rings after a warning sign, Asha's TV pauses her gently, says why, and one press calls her daughter.
@@ -21,7 +25,7 @@ Courier scams have two steps: a caller posing as a bank or the FTC frightens an 
 1. Asha tells Alexa about a reminder or asks "is this call real?". Kinwise matches documented scam warning signs with fixed, explainable rules and keeps **only the category labels**, never the words.
 2. Kinwise **asks**: "Would you like a 6-hour safety watch for your front door, and to tell Meera if it looks serious?" with **Turn on**, **Not now** and **Review privacy**. Nothing is watched or sent until she presses Turn on on her own TV (Alexa cannot tell who is speaking, so a spoken "turn it on" only points her to the TV; while a question is open Kinwise holds up to ten warning-sign labels, never words, for at most 30 minutes), and a "Not now" keeps no warning signs (it records only that she declined, in a line only she can see) and is not repeated for an hour. If she turns it on, Kinwise watches the door more closely for six hours and tells her daughter Meera there is a warning (a signal, not content).
 3. A stranger rings the Ring doorbell. Because she turned the watch on, Asha's **Fire TV shows the Pause and speaks it** (without it she would see only a gentle note): "someone is at your door, and no visit is expected right now. At 10:20 AM you asked Kinwise about a call, and it matched courier-scam warning signs." Meera's recorded message appears with captions, and **Call Meera** is focused on the remote.
-4. Asha presses it. **Meera is told for real**: an e-mail (and SMS or WhatsApp if she set them up) with an **I'm calling now** link. One button puts "I got your request and I'm calling you now" on Asha's TV, read aloud. If nobody answers, a second message goes out after about 2 minutes and the TV says so plainly. If no real channel could be reached, the TV says "We couldn't reach Meera" instead of promising a call.
+4. Asha presses it. **Meera is told for real** (and what Kinwise knows about the Pause is stated exactly: the hub records a Pause as *sent* when it decides, *shown* only when the TV app reports it drew the screen, and *not confirmed* if the TV app says nothing for 60 seconds; Meera's assistant says whichever is true, never that Asha saw it): an e-mail (and SMS or WhatsApp if she set them up) with an **I'm calling now** link. One button puts "I got your request and I'm calling you now" on Asha's TV, read aloud. If nobody answers, a second message goes out after about 2 minutes and the TV says so plainly. If no real channel could be reached, the TV says "We couldn't reach Meera" instead of promising a call.
 5. Meera's own Alexa shows a timeline of **signals, never recordings**. Asha can read, in Settings, every time family looked at her information, and turn anything off.
 
 ## How we built it
@@ -36,6 +40,7 @@ Courier scams have two steps: a caller posing as a bank or the FTC frightens an 
 ## Challenges
 
 - The Ring Developer Playground has no "person at the door" scene and no way to choose one, so the real feed correctly shows an empty doorstep and Kinwise stays quiet; the Pause in the demo is shown from our labelled doorbell simulator through the same rules.
+- The assistant's spoken paraphrase is not the hub's wording. In our live checks the hub's own text was right every time, but the Nova 2 Lite concierge that speaks it on the Echo sometimes softened or embellished it (for a Pause that was only *sent*, "Did Mom see the warning?" was once answered "Yes"). The video therefore shows the hub's exact words on the card and captions the drift; fixing the paraphrase is future work.
 - A third-party Fire TV app cannot draw over other apps, so the Pause only appears while Kinwise is the active app, and Kinwise has no supported way to know that. It records a Pause as **sent** when the hub decides and **shown** only when the TV app reports it drew the screen, and the family message says it cannot tell whether she saw it.
 - "Delivered" does not mean "read". We had to build the follow-up, an honest failure screen and a one-tap confirmation so the TV never promises help that is not coming.
 - A four-vendor audit of our notification code found real flaws (shared-address unsubscribes, late-confirmed subscriptions, an unsigned follow-up event, one wrong IAM grant). We fixed them and wrote down what we accepted and rejected ([`docs/security-review.md`](security-review.md)).
@@ -92,14 +97,14 @@ Fill in your own words. Facts to draw on are in [`product-feedback-notes.md`](pr
 
 ## Friction log (optional, up to a 10% bonus)
 
-Enter the 17 entries from [`friction-log.md`](friction-log.md) in the form's friction-log fields (task, steps, expected vs actual, severity, workaround, suggestion). A file in the repository is not enough.
+Enter the 18 entries from [`friction-log.md`](friction-log.md) in the form's friction-log fields (task, steps, expected vs actual, severity, workaround, suggestion). A file in the repository is not enough.
 
 ## Testing instructions (private field)
 
-1. **Offline, no accounts:** `node scripts/setup.mjs`, then `node scripts/dev.mjs --offline`; open http://localhost:5173 and http://localhost:5174; press **Ring the doorbell** after asking "is this call real?". Or run `node scripts/demo-scenario.mjs`.
-2. **Hosted demo:** `https://ujvlrh7vwd.execute-api.us-east-1.amazonaws.com` (MCP endpoint `/mcp`). Persona tokens: run `node scripts/demo-tokens.mjs` and paste its output **here only**.
+1. **Offline, no accounts:** `node scripts/setup.mjs`, then `node scripts/dev.mjs --offline`; open http://localhost:5173 (Echo) and http://localhost:5174 (TV). Ask "is this call real?" on the Echo: the TV shows a question with **Not now** focused. Press **Turn on** on the TV (a spoken "turn it on" is refused by design), then press **Ring the doorbell**. Or run `node scripts/demo-scenario.mjs` (add `--decline` to see "Not now").
+2. **Hosted demo:** `https://ujvlrh7vwd.execute-api.us-east-1.amazonaws.com` (MCP endpoint `/mcp`), deployed from commit `22ab5c2` on 2026-10-17. Persona tokens: run `node scripts/demo-tokens.mjs` and paste its output **here only**, never in a public field, the README or the video. The TV token (role `device`) is the only one that can turn the watch on: use it on `POST /tv/watch` with the `offerId` from `GET /tv/state`. `POST /dev/reset` (with Asha's token) restores the demo household.
 3. **Conformance:** `npx alexa-mcp-conformance --url <hub>/mcp --token <resident token> --service-token <service token>`.
-4. The Alexa+ surface and the Ring "person" moment are simulated and labelled; the Ring worker, the MCP server and the Vega app are real.
+4. **What is simulated:** the Alexa+ surface (a real MCP client and MCP Apps host, not Alexa+), Meera's phone panel, and the door event (the labelled doorbell simulator or a signed event; the Ring Playground has no person scene). The Ring worker, the MCP server, the hub and the Vega app are real. Text messages are AWS-sandbox only; e-mail is the verified family channel. What was and was not verified live after the deployment is in `docs/deployment-record.md`.
 
 ## Suggested GitHub "About" text (set it in the GitHub UI on each repo)
 

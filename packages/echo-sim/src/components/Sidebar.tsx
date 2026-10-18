@@ -4,7 +4,7 @@ import { clockTime } from '../lib/format';
 import { confirmCall, loadContacts, noticeKey, saveContacts, type Notice } from '../lib/hubApi';
 
 const KIND_ICON: Record<string, string> = { pause: '⏸', call_request: '📞', risk_high: '!' };
-const KIND_LABEL: Record<string, string> = { pause: 'Pause shown', call_request: 'Call request', risk_high: 'Warning signs' };
+const KIND_LABEL: Record<string, string> = { pause: 'Pause sent', call_request: 'Call request', risk_high: 'Warning signs' };
 
 /** "Meera's phone": the caregiver's notifications (polls the hub's dev outbox). */
 export function PhonePanel({ hubUrl, token }: { hubUrl: string; token?: string }) {

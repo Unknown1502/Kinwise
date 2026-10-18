@@ -1,5 +1,7 @@
 # Demo: repeatable scenario and a 2:40 storyboard
 
+> **Final cut (2026-10-18), supersedes the shot table below.** The submitted video is `kinwise-demo.mp4`, 2:42, recorded from the deployed version (`22ab5c2`): the Echo question and its privacy review; the real Vega consent sheet (Not now focused, then Turn on); the real Vega Pause; Meera's three answers (sent, shown, not confirmed) shown as the hub's exact words on the card; the e-mail text card; Settings and "who has seen my information" from the deployed app; the real Ring Playground clip; fresh AWS CLI evidence images; the conformance run recorded earlier (the same 22/22 and 16/16 were re-run on the final commit); and the Echo "under the hood" view. Labels in the video say what is simulated, and the spoken paraphrase drift is captioned. The old `take5` / `take6` footage below it is no longer used except the Ring clip, the conformance recording and the e-mail card text.
+
 The rules require a video under 3 minutes (judges need not watch past it), public on YouTube or Vimeo, in English, showing the project working on the platform it was built for. The footage below was recorded from the real running system; the narration is for you to write and speak.
 
 ## Run the story yourself (about 5 minutes)
@@ -32,7 +34,7 @@ What is simulated, and said so on screen: the Alexa+ surface (the Echo simulator
 
 Keep the Polly voice lines under your narration at about 20% volume (they are in `take5/audio` and `take6/vega/voice`). Avoid any third-party music or logos.
 
-## Footage that must be re-recorded after the consent change (2026-10-16)
+## Footage that had to be re-recorded after the consent change (done 2026-10-18, see the final cut above)
 
 The footage in `take5` and `take6` shows the old behaviour (the watch starts by itself) and the old TV chip text ("Meera has been told", now "Message sent to Meera"). Before the final video: redeploy the hosted stack, rebuild the Vega app, and record the Echo question card plus one "Not now" run. `python scripts/golden-path-check.py` reproduces both paths (and the "TV closed" failure) in a real browser against the local stack: 15 checks.
 
