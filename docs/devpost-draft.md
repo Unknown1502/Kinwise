@@ -8,7 +8,7 @@
 
 ## Demo video
 
-**Link: [paste the public YouTube or Vimeo URL here after you upload it, then open it in a private window to confirm it plays without signing in].** The edit is `D:\kinwise-demoinal3\kinwise-demo.mp4` (2:42, English narration with captions in `kinwise-demo-captions.srt`). It is recorded from the deployed version (commit `22ab5c2`). It labels what is simulated: the Alexa+ surface (an Echo Show web app), the doorbell event (the labelled simulator, because the Ring Developer Playground has no person scene), and Meera's phone panel; the Vega app is the real app on the Vega Virtual Device, and the Ring clip is the real Ring Partner API.
+**Link: [paste the public YouTube or Vimeo URL here after you upload it, then open it in a private window to confirm it plays without signing in].** The edit is `D:\kinwise-demoinal3\kinwise-demo.mp4` (2:49, English narration with captions in `kinwise-demo-captions.srt`). It is recorded from the deployed version (commit `22ab5c2`). It labels what is simulated: the Alexa+ surface (an Echo Show web app), the doorbell event (the labelled simulator, because the Ring Developer Playground has no person scene), and Meera's phone panel; the Vega app is the real app on the Vega Virtual Device, and the Ring clip is the real Ring Partner API.
 
 ## Elevator pitch (about 200 characters)
 
